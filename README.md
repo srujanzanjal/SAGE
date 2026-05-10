@@ -116,11 +116,17 @@ Chrome Extension:
 ## Folder Structure (high-level)
 
 SAGE/
+
 ├── backend/
+ 
 ├── frontend/
+
 ├── extension/
+
 ├── docs/
+
 ├── README.md
+
 └── .gitignore
 
 ### Backend highlights
@@ -192,17 +198,17 @@ npm run build
 
 ## Demo Flow (short)
 
-Website: https://www.python.org/about/ — Ask: "What is Python?"
-PDF: upload a small PDF — Ask: "What does SAGE stand for?"
-Video: use pre-analyzed short video — Ask: "What is this video about?"
-GitHub: https://github.com/0xTheProDev/fastapi-clean-example — Ask: "What does this repo do?"
+- Website: https://www.python.org/about/ — Ask: "What is Python?"
+- PDF: upload a small PDF — Ask: "What does SAGE stand for?"
+- Video: use pre-analyzed short video — Ask: "What is this video about?"
+- GitHub: https://github.com/0xTheProDev/fastapi-clean-example — Ask: "What does this repo do?"
 
 ## Testing summary
 
-Website: ready for demo (Playwright required for full integration)
-PDF: ready for demo (selectable text required)
-Video: ready for demo with pre-analyzed video recommended
-GitHub: ready for demo (public repos)
+- Website: ready for demo (Playwright required for full integration)
+- PDF: ready for demo (selectable text required)
+- Video: ready for demo with pre-analyzed video recommended
+- GitHub: ready for demo (public repos)
 
 ## Known limitations
 
