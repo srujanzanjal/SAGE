@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.15, pytest-8.3.4, pluggy-1.6.0 -- /Users/srujan/Downloads/sage-mvp 2/venv/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/srujan/Downloads/sage-mvp 2/backend
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collecting ... collected 2 items
+
+tests/test_github_ingestion.py::test_ingest_github_creates_line_metadata_and_persists_chunks PASSED [ 50%]
+tests/test_github_ingestion.py::test_build_context_includes_github_metadata PASSED [100%]
+
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:241
+<frozen importlib._bootstrap>:241
+  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:241
+<frozen importlib._bootstrap>:241
+  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+<frozen importlib._bootstrap>:241
+  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 2 passed, 5 warnings in 0.03s =========================
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

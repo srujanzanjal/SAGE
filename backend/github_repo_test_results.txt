@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.15, pytest-8.3.4, pluggy-1.6.0 -- /Users/srujan/Downloads/sage-mvp 2/venv/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/srujan/Downloads/sage-mvp 2/backend
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collecting ... collected 3 items
+
+tests/test_github_repo.py::test_parse_github_url_simple PASSED           [ 33%]
+tests/test_github_repo.py::test_parse_github_url_with_tree_branch PASSED [ 66%]
+tests/test_github_repo.py::test_chunk_file_by_lines_basic PASSED         [100%]
+
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:241
+<frozen importlib._bootstrap>:241
+  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:241
+<frozen importlib._bootstrap>:241
+  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+<frozen importlib._bootstrap>:241
+  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 3 passed, 5 warnings in 0.01s =========================
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

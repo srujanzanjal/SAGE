@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment variables and secrets
+.env
+*.env
+.env.local
+.env.*.local
+!.env.example
+
+# Backend runtime data
+backend/chroma_data/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+
+# Logs
+*.log
+logs/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+__MACOSX/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.tmp
+*.temp
+# Secrets
+*.env
+!.env.example
+# Python generated/runtime files
+# Local vector DB/runtime data
+# Frontend generated/runtime files
+# OS/editor
+__MACOSX/

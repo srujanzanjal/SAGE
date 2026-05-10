@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SAGE Website Panel</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div class="eyebrow">SAGE Extension</div>
+        <h1>Website Side Panel</h1>
+        <p>Analyze the current website with source-grounded answers from your local SAGE backend.</p>
+      </header>
+
+      <section class="panel config-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Backend</h2>
+            <p>Start the backend with <code>cd backend && python run.py</code>.</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>API base URL</span>
+          <input id="backend-url" type="url" spellcheck="false" placeholder="http://localhost:8000/api/v1" />
+        </label>
+        <div class="action-row">
+          <button id="save-backend" class="button secondary">Save</button>
+          <button id="check-backend" class="button secondary">Check backend</button>
+        </div>
+      </section>
+
+      <section class="panel tab-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Current tab</h2>
+            <p id="tab-summary">Detecting active tab...</p>
+          </div>
+          <button id="refresh-tab" class="button secondary">Refresh</button>
+        </div>
+        <div class="tab-card">
+          <div class="badge" id="tab-type">Unsupported</div>
+          <div class="tab-title" id="tab-title">No tab selected</div>
+          <div class="tab-url" id="tab-url"></div>
+        </div>
+        <button id="use-current-tab" class="button">Use current website</button>
+      </section>
+
+      <section class="panel ingest-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Crawl Website</h2>
+            <p id="ingest-help">Only normal website pages are supported inside the extension.</p>
+          </div>
+        </div>
+        <label class="field url-field">
+          <span>Website URL</span>
+          <input id="source-url" type="url" spellcheck="false" placeholder="https://www.python.org/about/" />
+        </label>
+        <div class="grid-two">
+          <label class="field">
+            <span>Max pages</span>
+            <input id="max-pages" type="number" min="1" max="100" value="10" />
+          </label>
+          <label class="field">
+            <span>Max depth</span>
+            <input id="max-depth" type="number" min="1" max="3" value="1" />
+          </label>
+        </div>
+        <button id="ingest-button" class="button primary">Crawl website</button>
+      </section>
+
+      <section class="panel sources-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Website Sources</h2>
+            <p>Select a website source to ask questions.</p>
+          </div>
+          <button id="refresh-sources" class="button secondary">Refresh</button>
+        </div>
+        <div id="sources-list" class="sources-list"></div>
+      </section>
+
+      <section class="panel qa-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Ask</h2>
+            <p>Questions use the selected website knowledgebase.</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>Selected website</span>
+          <select id="source-select"></select>
+        </label>
+        <label class="field">
+          <span>Question</span>
+          <textarea id="question" rows="4" placeholder="What does this website say about...? "></textarea>
+        </label>
+        <div class="grid-two">
+          <label class="field">
+            <span>Mode</span>
+            <select id="qa-mode">
+              <option value="grounded">Grounded</option>
+              <option value="exploratory">Exploratory</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Top K</span>
+            <input id="top-k" type="number" min="1" max="12" value="6" />
+          </label>
+        </div>
+        <button id="ask-button" class="button primary">Ask question</button>
+      </section>
+
+      <section class="panel result-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Status</h2>
+            <p id="result-summary">Ready.</p>
+          </div>
+        </div>
+        <pre id="result-output" class="result-output">No requests yet.</pre>
+      </section>
+    </main>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

@@ -1,0 +1,72 @@
+
+======================================================================
+CATEGORY C: GITHUB QA QUESTIONS (15 Questions in Grounded Mode)
+======================================================================
+  [C1] PASS    Conf: 0.38  Cits: 6  6 cit
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C2] FAIL    Conf: 0.00  Cits: 0  request failed
+  [C3] PARTIAL Conf: 0.29  Cits: 6  6 cit
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C4] FAIL    Conf: 0.00  Cits: 0  request failed
+  [C5] PASS    Conf: 0.47  Cits: 6  6 cit
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C6] FAIL    Conf: 0.00  Cits: 0  request failed
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C7] FAIL    Conf: 0.00  Cits: 0  request failed
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C8] FAIL    Conf: 0.00  Cits: 0  request failed
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C9] FAIL    Conf: 0.00  Cits: 0  request failed
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C10] FAIL    Conf: 0.00  Cits: 0  request failed
+  [C11] PASS    Conf: 0.33  Cits: 6  6 cit
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C12] FAIL    Conf: 0.00  Cits: 0  request failed
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [C13] FAIL    Conf: 0.00  Cits: 0  request failed
+  [C14] PARTIAL Conf: 0.21  Cits: 0  no cite
+  [C15] PASS    Conf: 0.34  Cits: 6  6 cit
+
+C Summary: 4/15 PASS, 2 PARTIAL, 9 FAIL
+
+======================================================================
+CATEGORY D: MODE BEHAVIOR TESTS
+======================================================================
+
+  [D1] Irrelevant question in grounded mode
+  [D1] PASS    Conf: 0.18  Cits: 0  low conf
+
+  [D2] Question rephrasing consistency
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [D2] FAIL    Conf: 0.00  Cits: 0  one failed
+
+  [D3] Vague question
+  [D3] PASS    Conf: 0.36  Cits: 6  found setup
+
+D Summary: 2/3 PASS, 0 PARTIAL, 1 FAIL
+
+======================================================================
+CATEGORY E: CITATION ACCURACY TESTS (5 Answers)
+======================================================================
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [E1] FAIL    Conf: 0.00  Cits: 0  failed
+  [E2] PASS    Conf: 0.34  Cits: 6  6 valid cit
+  [E3] PASS    Conf: 0.30  Cits: 6  6 valid cit
+    ERROR: HTTPConnectionPool(host='127.0.0.1', port=8000): R
+  [E4] FAIL    Conf: 0.00  Cits: 0  failed
+  [E5] PASS    Conf: 0.35  Cits: 6  6 valid cit
+
+E Summary: 3/5 PASS, 0 PARTIAL, 2 FAIL
+
+======================================================================
+OVERALL SUMMARY
+======================================================================
+
+Category C (QA): 4/15 PASS, 2 PARTIAL, 9 FAIL
+Category D (Mode): 2/3 PASS, 0 PARTIAL, 1 FAIL
+Category E (Citations): 3/5 PASS, 0 PARTIAL, 2 FAIL
+
+TOTAL: 9/23 PASS (2 PARTIAL, 12 FAIL)
+Pass Rate: 39.1%
+
