@@ -95,11 +95,21 @@ class WebsiteCrawlResponse(BaseModel):
     sources_created: list[IngestResponse]
 
 
+class ConversationTurn(BaseModel):
+    question: str = Field(max_length=2000)
+    answer: str = Field(max_length=6000)
+
+
 class QuestionRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     mode: Mode = "grounded"
     knowledgebase_id: Optional[str] = None
     source_id: Optional[str] = None
+    # Combine multiple sources (any mix of types) into one question. When set,
+    # takes precedence over knowledgebase_id/source_id.
+    source_ids: Optional[list[str]] = Field(default=None, max_length=12)
+    # Prior turns in this chat thread, oldest first, for follow-up questions.
+    history: Optional[list[ConversationTurn]] = Field(default=None, max_length=6)
     top_k: int = Field(default=6, ge=1, le=15)
 
 
@@ -157,6 +167,10 @@ class SourceDetail(BaseModel):
     meta: dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+class SourceOverviewResponse(BaseModel):
+    summary: Optional[str] = None
 
 
 class KnowledgebaseDetail(BaseModel):

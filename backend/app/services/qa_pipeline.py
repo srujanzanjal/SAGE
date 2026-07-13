@@ -1,5 +1,7 @@
+import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass
 from time import perf_counter
 
 from app.core.config import get_settings
@@ -46,6 +48,46 @@ def _truncate_text(text: str, max_chars: int) -> str:
     return text[: max_chars - 3].rstrip() + "..."
 
 
+def _apply_source_diversity_floor(
+    ranked_chunks: list[RetrievedChunk],
+    top_k: int,
+    source_ids: list[str] | None,
+) -> list[RetrievedChunk]:
+    """For combined multi-source questions, reserve each source's single
+    best-ranked chunk before filling remaining slots by pure score.
+
+    Without this, a compound question can let one source's stronger matches
+    crowd out every other combined source at a small top_k, silently
+    answering only "half" the question.
+    """
+    if not source_ids or len(source_ids) < 2:
+        return ranked_chunks[:top_k]
+
+    selected: list[RetrievedChunk] = []
+    selected_ids: set[str] = set()
+    seen_sources: set[str] = set()
+
+    for chunk in ranked_chunks:
+        if len(selected) >= top_k:
+            break
+        sid = chunk.metadata.get("source_id")
+        if sid in source_ids and sid not in seen_sources:
+            selected.append(chunk)
+            selected_ids.add(chunk.chunk_id)
+            seen_sources.add(sid)
+
+    for chunk in ranked_chunks:
+        if len(selected) >= top_k:
+            break
+        if chunk.chunk_id in selected_ids:
+            continue
+        selected.append(chunk)
+        selected_ids.add(chunk.chunk_id)
+
+    selected.sort(key=lambda c: c.score, reverse=True)
+    return selected[:top_k]
+
+
 def _overview_label(metadata: dict[str, object]) -> str:
     overview_type = str(metadata.get("overview_type") or "").lower()
     return {
@@ -57,6 +99,16 @@ def _overview_label(metadata: dict[str, object]) -> str:
 
 
 def _resolve_source_type(request: QuestionRequest, repo) -> str | None:
+    if request.source_ids:
+        types = set()
+        for source_id in request.source_ids:
+            source = repo.get_source(source_id)
+            if source and source.get("source_type"):
+                types.add(str(source.get("source_type")))
+        # Only apply source-type-specific tuning (e.g. GitHub's tighter budget)
+        # when every combined source shares the same type; a mixed-type
+        # question gets the generic budget.
+        return types.pop() if len(types) == 1 else None
     if request.source_id:
         source = repo.get_source(request.source_id)
         if source and source.get("source_type"):
@@ -121,37 +173,9 @@ def build_context(
         context_block = "\n".join(context_lines)
         remaining = max_context_chars - context_chars
         if remaining <= 0:
-            citations.append(
-                Citation(
-                    citation_id=citation_id,
-                    chunk_id=chunk.chunk_id,
-                    source_id=str(metadata.get("source_id")),
-                    source_type=source_type,
-                    source_ref=str(metadata.get("source_ref")),
-                    source_title=metadata.get("source_title"),
-                    snippet=snippet,
-                    page_number=metadata.get("page_number"),
-                    chunk_index=int(metadata.get("chunk_index", 0)),
-                    score=float(chunk.score),
-                    video_id=metadata.get("video_id"),
-                    timestamp_label=metadata.get("timestamp_label"),
-                    start_time=metadata.get("start_time"),
-                    end_time=metadata.get("end_time"),
-                    file_path=metadata.get("file_path"),
-                    language=metadata.get("language"),
-                    start_line=metadata.get("start_line"),
-                    end_line=metadata.get("end_line"),
-                    repo_owner=metadata.get("repo_owner"),
-                    repo_name=metadata.get("repo_name"),
-                    branch=metadata.get("branch"),
-                    file_url=(
-                        f"https://github.com/{metadata.get('repo_owner')}/{metadata.get('repo_name')}/blob/{metadata.get('branch') or 'HEAD'}/{metadata.get('file_path')}#L{metadata.get('start_line')}-L{metadata.get('end_line')}"
-                            if metadata.get("source_type") == "github" and metadata.get("file_path") and metadata.get("repo_owner") and metadata.get("repo_name") and metadata.get("chunk_kind") not in {"source_overview", "repo_overview"}
-                        else None
-                    ),
-                )
-            )
-            continue
+            # Context budget is used up: stop here rather than citing a chunk
+            # whose text never actually reached the model.
+            break
 
         if len(context_block) > remaining:
             context_block = _truncate_text(context_block, remaining)
@@ -191,25 +215,58 @@ def build_context(
     return "\n\n---\n\n".join(context_parts), citations
 
 
-def answer_question(request: QuestionRequest) -> AnswerResponse:
-    started_at = perf_counter()
-    settings = get_settings()
-    repo = get_supabase_repository()
-    llm = get_llm_service()
+@dataclass
+class _RetrievalContext:
+    """Everything computed before the LLM is asked to write the answer text.
+
+    Shared by the plain (answer_question) and streaming (stream_answer_question)
+    paths so both surfaces retrieve, rerank, and score chunks identically —
+    only the answer-generation step itself differs between them.
+    """
+
+    rewritten_query: str
+    source_type: str | None
+    effective_top_k: int
+    ranked_chunks: list[RetrievedChunk]
+    confidence: float
+    confidence_label: str
+    confidence_reason: str
+    context: str
+    citations: list[Citation]
+    should_generate: bool
+    preset_answer: str
+    base_warnings: list[str]
+    follow_up_question: str | None
+    is_video: bool
+    retrieved_sources: list[dict]
+    retrieved_source_count: int
+    history_dicts: list[dict] | None
+    retrieval_ms: float
+    rerank_ms: float
+    context_chars: int
+
+
+def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _RetrievalContext:
     source_type = _resolve_source_type(request, repo)
     is_github_source = source_type == "github"
     effective_top_k = min(request.top_k, GITHUB_QA_TOP_K) if is_github_source else request.top_k
     search_top_k = min(max(effective_top_k * 2, effective_top_k), GITHUB_QA_MAX_SEARCH_RESULTS) if is_github_source else max(request.top_k * 2, request.top_k)
+    if request.source_ids and len(request.source_ids) > 1:
+        # Widen the raw candidate pool so reranking has a fair shot at
+        # surfacing chunks from every combined source, not just the one
+        # with the strongest single match.
+        search_top_k = min(search_top_k * len(request.source_ids), 40)
     max_context_chars = GITHUB_QA_MAX_CONTEXT_CHARS if is_github_source else DEFAULT_QA_MAX_CONTEXT_CHARS
     max_chunk_chars = GITHUB_QA_MAX_CHUNK_CHARS if is_github_source else DEFAULT_QA_MAX_CHUNK_CHARS
 
     retrieval_started = perf_counter()
+    history_dicts = [turn.model_dump() for turn in request.history] if request.history else None
 
     rewritten_query = request.question
     if should_rewrite(request.question):
         try:
-            rewritten_query = llm.rewrite_query(request.question)
-        except LLMServiceTimeoutError as exc:
+            rewritten_query = llm.rewrite_query(request.question, history=history_dicts)
+        except LLMServiceTimeoutError:
             rewritten_query = request.question
             logger.warning("qa_rewrite_timeout source_type=%s top_k=%s", source_type or "unknown", effective_top_k)
 
@@ -218,61 +275,50 @@ def answer_question(request: QuestionRequest) -> AnswerResponse:
         query_embedding=query_embedding,
         knowledgebase_id=request.knowledgebase_id,
         source_id=request.source_id,
+        source_ids=request.source_ids,
         top_k=search_top_k,
     )
     retrieval_ms = (perf_counter() - retrieval_started) * 1000
 
     rerank_started = perf_counter()
-    ranked_chunks = rerank_chunks(rewritten_query, raw_chunks)[:effective_top_k]
+    ranked_chunks = _apply_source_diversity_floor(
+        rerank_chunks(rewritten_query, raw_chunks), effective_top_k, request.source_ids
+    )
     rerank_ms = (perf_counter() - rerank_started) * 1000
 
     confidence = calculate_confidence(ranked_chunks)
     confidence_label, confidence_reason = confidence_label_and_reason(rewritten_query, ranked_chunks, confidence)
 
     follow_up_question = None
-    llm_ms = 0.0
-    context_chars = 0
+    context = ""
+    citations: list[Citation] = []
+    should_generate = True
+    preset_answer = ""
+    base_warnings: list[str] = []
+    is_video = False
+
     # If no chunks retrieved, we must refuse.
     if not ranked_chunks:
-        answer = "I couldn't produce a reliable grounded answer from the selected source."
-        context = ""
-        citations: list[Citation] = []
-        warnings = ["No relevant transcript evidence found."]
+        should_generate = False
+        preset_answer = "I couldn't produce a reliable grounded answer from the selected source."
+        base_warnings = ["No relevant transcript evidence found."]
         follow_up_question = _build_follow_up_question(request.question, ranked_chunks)
     else:
         # For video sources, allow grounded answers even when confidence is low
         is_video = source_type == "video" or any((c.metadata.get("source_type") == "video" or c.metadata.get("chunk_kind") == "video_overview") for c in ranked_chunks)
         if request.mode == "grounded" and confidence < LOW_CONFIDENCE_THRESHOLD and not is_video:
-            answer = "I couldn't produce a reliable grounded answer from the selected source."
-            context = ""
-            citations = []
-            warnings = ["Low retrieval confidence. No grounded answer was generated."]
+            should_generate = False
+            preset_answer = "I couldn't produce a reliable grounded answer from the selected source."
+            base_warnings = ["Low retrieval confidence. No grounded answer was generated."]
             follow_up_question = _build_follow_up_question(request.question, ranked_chunks)
         else:
-            # Build context and produce an answer. For low-confidence video answers, include a caution warning but still return citations.
+            # Build context. For low-confidence video answers, still generate but flag it below.
             context, citations = build_context(
                 ranked_chunks,
                 max_context_chars=max_context_chars,
                 max_chunk_chars=max_chunk_chars,
             )
-            context_chars = len(context)
-            llm_started = perf_counter()
-            try:
-                answer = llm.generate_answer(question=request.question, context=context, mode=request.mode)
-            except LLMServiceTimeoutError as exc:
-                answer = str(exc)
-                warnings = [str(exc)]
-                llm_ms = (perf_counter() - llm_started) * 1000
-                logger.warning("qa_llm_timeout source_type=%s top_k=%s context_chars=%s", source_type or "unknown", effective_top_k, context_chars)
-            else:
-                llm_ms = (perf_counter() - llm_started) * 1000
-                warnings = []
-            if confidence < 0.45:
-                # for videos, produce a more descriptive warning
-                if is_video:
-                    warnings.append("Low confidence but transcript evidence exists. Verify citations.")
-                else:
-                    warnings.append("Answer is based on weak source matches. Verify citations carefully.")
+
     retrieved_sources = [
         {
             "chunk_id": c.chunk_id,
@@ -299,40 +345,99 @@ def answer_question(request: QuestionRequest) -> AnswerResponse:
     ]
     retrieved_source_count = len({str(c.metadata.get("source_id")) for c in ranked_chunks if c.metadata.get("source_id")})
 
-    history_write_ms = 0.0
-    if settings.store_query_history:
-        history_started = perf_counter()
+    return _RetrievalContext(
+        rewritten_query=rewritten_query,
+        source_type=source_type,
+        effective_top_k=effective_top_k,
+        ranked_chunks=ranked_chunks,
+        confidence=confidence,
+        confidence_label=confidence_label,
+        confidence_reason=confidence_reason,
+        context=context,
+        citations=citations,
+        should_generate=should_generate,
+        preset_answer=preset_answer,
+        base_warnings=base_warnings,
+        follow_up_question=follow_up_question,
+        is_video=is_video,
+        retrieved_sources=retrieved_sources,
+        retrieved_source_count=retrieved_source_count,
+        history_dicts=history_dicts,
+        retrieval_ms=retrieval_ms,
+        rerank_ms=rerank_ms,
+        context_chars=len(context),
+    )
+
+
+def _save_query_history_sync(repo, request: QuestionRequest, rc: "_RetrievalContext", answer: str, warnings: list[str]) -> float:
+    """Best-effort query history write with a bounded timeout. Returns elapsed ms."""
+    settings = get_settings()
+    if not settings.store_query_history:
+        return 0.0
+    history_started = perf_counter()
+    try:
+        future = _history_executor.submit(
+            repo.save_query_history,
+            knowledgebase_id=request.knowledgebase_id,
+            source_id=request.source_id,
+            question=request.question,
+            rewritten_query=rc.rewritten_query,
+            mode=request.mode,
+            answer=answer,
+            confidence=rc.confidence,
+            retrieved_chunk_ids=[c.chunk_id for c in rc.ranked_chunks],
+        )
+        future.result(timeout=settings.query_history_timeout_seconds)
+    except FuturesTimeoutError:
+        logger.warning("qa_history_write_timeout source_type=%s top_k=%s", rc.source_type or "unknown", rc.effective_top_k)
+        warnings.append("Could not save query history.")
+    except Exception:
+        logger.warning("qa_history_write_failed source_type=%s top_k=%s", rc.source_type or "unknown", rc.effective_top_k, exc_info=True)
+        # Query history must not break the user's answer.
+        warnings.append("Could not save query history.")
+    return (perf_counter() - history_started) * 1000
+
+
+def answer_question(request: QuestionRequest) -> AnswerResponse:
+    started_at = perf_counter()
+    repo = get_supabase_repository()
+    llm = get_llm_service()
+
+    rc = _retrieve_and_build_context(request, repo, llm)
+
+    warnings = list(rc.base_warnings)
+    llm_ms = 0.0
+    if not rc.should_generate:
+        answer = rc.preset_answer
+    else:
+        llm_started = perf_counter()
         try:
-            future = _history_executor.submit(
-                repo.save_query_history,
-                knowledgebase_id=request.knowledgebase_id,
-                source_id=request.source_id,
-                question=request.question,
-                rewritten_query=rewritten_query,
-                mode=request.mode,
-                answer=answer,
-                confidence=confidence,
-                retrieved_chunk_ids=[c.chunk_id for c in ranked_chunks],
-            )
-            future.result(timeout=settings.query_history_timeout_seconds)
-        except FuturesTimeoutError:
-            logger.warning("qa_history_write_timeout source_type=%s top_k=%s", source_type or "unknown", effective_top_k)
-            warnings.append("Could not save query history.")
-        except Exception:
-            logger.warning("qa_history_write_failed source_type=%s top_k=%s", source_type or "unknown", effective_top_k, exc_info=True)
-            # Query history must not break the user's answer.
-            warnings.append("Could not save query history.")
-        finally:
-            history_write_ms = (perf_counter() - history_started) * 1000
+            answer = llm.generate_answer(question=request.question, context=rc.context, mode=request.mode, history=rc.history_dicts)
+        except LLMServiceTimeoutError as exc:
+            answer = str(exc)
+            warnings = [str(exc)]
+            llm_ms = (perf_counter() - llm_started) * 1000
+            logger.warning("qa_llm_timeout source_type=%s top_k=%s context_chars=%s", rc.source_type or "unknown", rc.effective_top_k, rc.context_chars)
+        else:
+            llm_ms = (perf_counter() - llm_started) * 1000
+            warnings = []
+        if rc.confidence < 0.45:
+            # for videos, produce a more descriptive warning
+            if rc.is_video:
+                warnings.append("Low confidence but transcript evidence exists. Verify citations.")
+            else:
+                warnings.append("Answer is based on weak source matches. Verify citations carefully.")
+
+    history_write_ms = _save_query_history_sync(repo, request, rc, answer, warnings)
 
     total_ms = (perf_counter() - started_at) * 1000
     logger.info(
         "qa_timing source_type=%s top_k=%s context_chars=%s retrieval_ms=%.1f rerank_ms=%.1f llm_ms=%.1f history_write_ms=%.1f total_ms=%.1f",
-        source_type or "unknown",
-        effective_top_k,
-        context_chars,
-        retrieval_ms,
-        rerank_ms,
+        rc.source_type or "unknown",
+        rc.effective_top_k,
+        rc.context_chars,
+        rc.retrieval_ms,
+        rc.rerank_ms,
         llm_ms,
         history_write_ms,
         total_ms,
@@ -342,13 +447,68 @@ def answer_question(request: QuestionRequest) -> AnswerResponse:
         answer=answer,
         mode=request.mode,
         question=request.question,
-        rewritten_query=rewritten_query,
-        confidence_score=confidence,
-        confidence_label=confidence_label,
-        confidence_reason=confidence_reason,
-        retrieved_source_count=retrieved_source_count,
-        citations=citations,
-        retrieved_sources=retrieved_sources,
-        follow_up_question=follow_up_question,
+        rewritten_query=rc.rewritten_query,
+        confidence_score=rc.confidence,
+        confidence_label=rc.confidence_label,
+        confidence_reason=rc.confidence_reason,
+        retrieved_source_count=rc.retrieved_source_count,
+        citations=rc.citations,
+        retrieved_sources=rc.retrieved_sources,
+        follow_up_question=rc.follow_up_question,
         warnings=warnings,
     )
+
+
+def format_sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def stream_answer_question(request: QuestionRequest):
+    """Generator of SSE-formatted text: one 'meta' event (everything except
+    the answer text), then 'delta' events with answer text chunks as the LLM
+    produces them, then a final 'done' event with the resolved warnings.
+    """
+    repo = get_supabase_repository()
+    llm = get_llm_service()
+
+    rc = _retrieve_and_build_context(request, repo, llm)
+
+    yield format_sse_event(
+        "meta",
+        {
+            "mode": request.mode,
+            "question": request.question,
+            "rewritten_query": rc.rewritten_query,
+            "confidence_score": rc.confidence,
+            "confidence_label": rc.confidence_label,
+            "confidence_reason": rc.confidence_reason,
+            "retrieved_source_count": rc.retrieved_source_count,
+            "citations": [c.model_dump() for c in rc.citations],
+            "retrieved_sources": rc.retrieved_sources,
+            "follow_up_question": rc.follow_up_question,
+        },
+    )
+
+    warnings = list(rc.base_warnings)
+    full_answer = ""
+    if not rc.should_generate:
+        full_answer = rc.preset_answer
+        yield format_sse_event("delta", {"text": full_answer})
+    else:
+        try:
+            for piece in llm.generate_answer_stream(question=request.question, context=rc.context, mode=request.mode, history=rc.history_dicts):
+                full_answer += piece
+                yield format_sse_event("delta", {"text": piece})
+        except LLMServiceTimeoutError as exc:
+            warnings = [str(exc)]
+            error_text = ("\n\n" if full_answer else "") + str(exc)
+            full_answer += error_text
+            yield format_sse_event("delta", {"text": error_text})
+        if rc.confidence < 0.45:
+            if rc.is_video:
+                warnings.append("Low confidence but transcript evidence exists. Verify citations.")
+            else:
+                warnings.append("Answer is based on weak source matches. Verify citations carefully.")
+
+    _save_query_history_sync(repo, request, rc, full_answer, warnings)
+    yield format_sse_event("done", {"answer": full_answer, "warnings": warnings})

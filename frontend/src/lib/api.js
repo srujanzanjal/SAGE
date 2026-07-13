@@ -111,6 +111,10 @@ export async function listSourcesGrouped() {
   return requestJson(`${API_BASE}/sources/grouped`);
 }
 
+export async function getSourceSummary(sourceId) {
+  return requestJson(`${API_BASE}/sources/${sourceId}/summary`);
+}
+
 export async function getSourceDetails(sourceId) {
   return requestJson(`${API_BASE}/sources/${sourceId}`);
 }
@@ -201,10 +205,65 @@ export async function ingestPdf(file) {
   });
 }
 
-export async function askQuestion({ question, mode, knowledgebase_id, source_id, top_k = 6 }) {
+export async function askQuestion({ question, mode, knowledgebase_id, source_id, source_ids, history, top_k = 6 }) {
   return requestJson(`${API_BASE}/qa/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, mode, knowledgebase_id, source_id, top_k })
+    body: JSON.stringify({ question, mode, knowledgebase_id, source_id, source_ids, history, top_k })
   });
+}
+
+// Streams the answer token-by-token over SSE. Calls onMeta once (citations,
+// confidence, etc.), onDelta for each text chunk, then onDone with the final
+// assembled answer + warnings. Throws ApiError up front if the request itself
+// fails to even start (bad request, backend down).
+export async function askQuestionStream(
+  { question, mode, knowledgebase_id, source_id, source_ids, history, top_k = 6 },
+  { onMeta, onDelta, onDone, signal } = {}
+) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE}/qa/ask/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, mode, knowledgebase_id, source_id, source_ids, history, top_k }),
+      signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw error;
+    throw new Error("Backend unavailable. Start the SAGE backend and try again.");
+  }
+
+  if (!response.ok || !response.body) {
+    await parseResponse(response); // throws a friendly ApiError
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let boundary;
+    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+      const rawEvent = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      let eventName = "message";
+      let data = "";
+      for (const line of rawEvent.split("\n")) {
+        if (line.startsWith("event:")) eventName = line.slice(6).trim();
+        else if (line.startsWith("data:")) data += line.slice(5).trim();
+      }
+      if (!data) continue;
+      const parsed = JSON.parse(data);
+      if (eventName === "meta") onMeta?.(parsed);
+      else if (eventName === "delta") onDelta?.(parsed.text);
+      else if (eventName === "done") onDone?.(parsed);
+      else if (eventName === "error") throw new ApiError(parsed.message || "Question answering failed.");
+    }
+  }
 }

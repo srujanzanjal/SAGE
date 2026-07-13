@@ -77,6 +77,13 @@ class WebsiteInvalidUrlError(WebsiteIngestionError):
         super().__init__(message, error_code="WEBSITE_INVALID_URL", status_code=400)
 
 
+class UnsafeUrlError(WebsiteIngestionError):
+    """Raised when a URL resolves to a non-public address (SSRF guard)."""
+
+    def __init__(self, message: str = "This URL cannot be fetched."):
+        super().__init__(message, error_code="UNSAFE_URL", status_code=400)
+
+
 class WebsiteCrawlTimeoutError(WebsiteIngestionError):
     """Raised when crawling times out before usable pages are ingested."""
 

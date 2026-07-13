@@ -18,7 +18,7 @@
         <div class="panel-header">
           <div>
             <h2>Backend</h2>
-            <p>Start the backend with <code>cd backend && python run.py</code>.</p>
+            <p>Start the backend with <code>cd backend && python run.py</code>. Only a localhost/127.0.0.1 backend is supported.</p>
           </div>
         </div>
         <label class="field">
@@ -29,6 +29,7 @@
           <button id="save-backend" class="button secondary">Save</button>
           <button id="check-backend" class="button secondary">Check backend</button>
         </div>
+        <p id="backend-status" class="qa-status"></p>
       </section>
 
       <section class="panel tab-panel">
@@ -69,13 +70,17 @@
           </label>
         </div>
         <button id="ingest-button" class="button primary">Crawl website</button>
+        <div id="ingest-progress" class="progress hidden">
+          <div class="progress-bar"><div id="ingest-progress-fill" class="progress-fill"></div></div>
+          <p id="ingest-progress-label"></p>
+        </div>
       </section>
 
       <section class="panel sources-panel">
         <div class="panel-header">
           <div>
             <h2>Website Sources</h2>
-            <p>Select a website source to ask questions.</p>
+            <p>Select one or more sources to ask questions across.</p>
           </div>
           <button id="refresh-sources" class="button secondary">Refresh</button>
         </div>
@@ -86,16 +91,16 @@
         <div class="panel-header">
           <div>
             <h2>Ask</h2>
-            <p>Questions use the selected website knowledgebase.</p>
+            <p id="selected-sources-summary">No source selected.</p>
           </div>
+          <button id="new-chat" class="button secondary hidden">New chat</button>
         </div>
-        <label class="field">
-          <span>Selected website</span>
-          <select id="source-select"></select>
-        </label>
+
+        <div id="chat-thread" class="chat-thread hidden"></div>
+
         <label class="field">
           <span>Question</span>
-          <textarea id="question" rows="4" placeholder="What does this website say about...? "></textarea>
+          <textarea id="question" rows="3" placeholder="What does this website say about...? "></textarea>
         </label>
         <div class="grid-two">
           <label class="field">
@@ -111,16 +116,7 @@
           </label>
         </div>
         <button id="ask-button" class="button primary">Ask question</button>
-      </section>
-
-      <section class="panel result-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Status</h2>
-            <p id="result-summary">Ready.</p>
-          </div>
-        </div>
-        <pre id="result-output" class="result-output">No requests yet.</pre>
+        <p id="qa-status" class="qa-status"></p>
       </section>
     </main>
     <script src="sidepanel.js"></script>
