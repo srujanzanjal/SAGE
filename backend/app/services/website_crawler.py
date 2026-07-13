@@ -8,9 +8,10 @@ from typing import Set
 from urllib.parse import urljoin, urlparse, urlunparse
 from collections import deque
 
-from app.services.url_utils import normalize_url
+from app.services.url_utils import assert_public_http_url, normalize_url
 from app.utils.exceptions import (
     SourceExtractionError,
+    UnsafeUrlError,
     WebsiteCrawlTimeoutError,
     WebsiteInvalidUrlError,
     WebsiteNoUsableTextError,
@@ -79,20 +80,26 @@ async def extract_page_with_playwright(
         WebExtractionResult with text, title, and internal links
     """
     warnings: list[str] = []
-    
+
+    # Fail fast on the starting URL; the route handler below also blocks any
+    # redirect hop that lands on an internal/private address mid-navigation.
+    assert_public_http_url(url)
+
     try:
         # Navigate with resource blocking for performance
         await page.route(
             "**/*",
             _handle_route
         )
-        
+
         # Navigate to the page
         await page.goto(
             url,
             wait_until="domcontentloaded",
             timeout=15000  # 15 second timeout
         )
+    except UnsafeUrlError:
+        raise
     except Exception as e:
         if "timeout" in str(e).lower() or "timed out" in str(e).lower():
             raise WebsiteCrawlTimeoutError() from e
@@ -158,17 +165,26 @@ async def extract_page_with_playwright(
 
 async def _handle_route(route) -> None:
     """
-    Route handler to block unnecessary resources.
+    Route handler to block unnecessary resources, and to block navigation
+    (including mid-navigation redirects) to internal/private addresses.
     Allows: documents, scripts, XHR/fetch, stylesheets
-    Blocks: images, fonts, media, videos
+    Blocks: images, fonts, media, videos, non-public document requests
     """
-    request_type = route.request.resource_type
-    
-    # Block unnecessary resources
+    request = route.request
+    request_type = request.resource_type
+
     if request_type in ["image", "font", "media"]:
         await route.abort()
-    else:
-        await route.continue_()
+        return
+
+    if request_type == "document":
+        try:
+            assert_public_http_url(request.url)
+        except UnsafeUrlError:
+            await route.abort()
+            return
+
+    await route.continue_()
 
 
 def _normalize_page_url(url: str, base_domain: str) -> str | None:
@@ -256,64 +272,63 @@ async def crawl_website_async(
     # Launch browser once for all pages
     async with async_playwright() as p:
         try:
-            # Launch Chromium in headless mode
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                viewport={"width": 1280, "height": 720},
-                user_agent="SAGE-MVP/1.0 (+https://example.local) Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            )
-            
-            while queue and len(crawled_pages) < max_pages:
-                current_url, current_depth = queue.popleft()
-                
-                # Create a new page for this request
-                page = await context.new_page()
-                
-                try:
-                    # Extract page content
-                    result = await extract_page_with_playwright(
-                        page, current_url, base_domain, settings, preferred_netloc
-                    )
-                    
-                    page_obj = CrawledPage(
-                        url=current_url,
-                        normalized_url=current_url,
-                        title=result.title,
-                        text=result.text,
-                        final_url=result.final_url
-                    )
-                    crawled_pages.append(page_obj)
-                    all_warnings.extend(result.warnings)
-                    
-                    # Extract links if we haven't reached max depth
-                    if current_depth < max_depth:
-                        for link in result.links:
-                            if link not in visited_urls and len(crawled_pages) < max_pages:
-                                visited_urls.add(link)
-                                queue.append((link, current_depth + 1))
-                            elif link not in visited_urls:
-                                pages_skipped += 1
-                
-                except SourceExtractionError as e:
-                    failed_pages[current_url] = str(e)
-                except asyncio.TimeoutError:
-                    failed_pages[current_url] = "Page load timeout"
-                except Exception as e:
-                    failed_pages[current_url] = f"Unexpected error: {str(e)}"
-                finally:
-                    await page.close()
-            
-            # Close browser and context
-            await context.close()
-            await browser.close()
-        
         except Exception as e:
-            # If browser launch fails
             if "Chromium" in str(e) or "not found" in str(e):
                 raise SourceExtractionError(
                     "Playwright/Chromium is not installed. Run: python -m playwright install chromium"
                 )
             raise SourceExtractionError(f"Browser error: {str(e)}")
+
+        try:
+            context = await browser.new_context(
+                viewport={"width": 1280, "height": 720},
+                user_agent="SAGE-MVP/1.0 (+https://example.local) Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            )
+            try:
+                while queue and len(crawled_pages) < max_pages:
+                    current_url, current_depth = queue.popleft()
+
+                    # Create a new page for this request
+                    page = await context.new_page()
+
+                    try:
+                        # Extract page content
+                        result = await extract_page_with_playwright(
+                            page, current_url, base_domain, settings, preferred_netloc
+                        )
+
+                        page_obj = CrawledPage(
+                            url=current_url,
+                            normalized_url=current_url,
+                            title=result.title,
+                            text=result.text,
+                            final_url=result.final_url
+                        )
+                        crawled_pages.append(page_obj)
+                        all_warnings.extend(result.warnings)
+
+                        # Extract links if we haven't reached max depth
+                        if current_depth < max_depth:
+                            for link in result.links:
+                                if link not in visited_urls and len(crawled_pages) < max_pages:
+                                    visited_urls.add(link)
+                                    queue.append((link, current_depth + 1))
+                                elif link not in visited_urls:
+                                    pages_skipped += 1
+
+                    except SourceExtractionError as e:
+                        failed_pages[current_url] = str(e)
+                    except asyncio.TimeoutError:
+                        failed_pages[current_url] = "Page load timeout"
+                    except Exception as e:
+                        failed_pages[current_url] = f"Unexpected error: {str(e)}"
+                    finally:
+                        await page.close()
+            finally:
+                await context.close()
+        finally:
+            await browser.close()
     
     summary = CrawlSummary(
         starting_url=starting_url,

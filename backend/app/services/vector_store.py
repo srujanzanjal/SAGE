@@ -66,15 +66,21 @@ class VectorStore:
         query_embedding: list[float],
         knowledgebase_id: Optional[str] = None,
         source_id: Optional[str] = None,
+        source_ids: Optional[list[str]] = None,
         top_k: int = 6,
     ) -> list[RetrievedChunk]:
-        where = None
-        if knowledgebase_id and source_id:
+        if source_ids:
+            # Combined multi-source question: sources may span different
+            # knowledgebases, so knowledgebase_id/source_id are ignored here.
+            where = {"source_id": {"$in": list(source_ids)}}
+        elif knowledgebase_id and source_id:
             where = {"$and": [{"knowledgebase_id": knowledgebase_id}, {"source_id": source_id}]}
         elif knowledgebase_id:
             where = {"knowledgebase_id": knowledgebase_id}
         elif source_id:
             where = {"source_id": source_id}
+        else:
+            where = None
 
         result = self.collection.query(
             query_embeddings=[query_embedding],
@@ -100,6 +106,27 @@ class VectorStore:
                 )
             )
         return retrieved
+
+    def get_overview_text(self, source_id: str) -> Optional[str]:
+        """Fetch the deterministic overview chunk's raw text for a source, if any.
+
+        This is a direct metadata lookup (no embedding/LLM call) — the overview
+        chunk is generated once at ingestion time from source stats.
+        """
+        result = self.collection.get(
+            where={"$and": [{"source_id": source_id}, {"chunk_kind": "source_overview"}]},
+            include=["documents"],
+            limit=1,
+        )
+        docs = result.get("documents") or []
+        if not docs:
+            return None
+        text = docs[0] or ""
+        # Strip the internal retrieval marker line (e.g. "__SAGE_WEBSITE_OVERVIEW__").
+        lines = text.splitlines()
+        if lines and lines[0].startswith("__SAGE_") and lines[0].endswith("__"):
+            lines = lines[1:]
+        return "\n".join(lines).strip() or None
 
     def delete_by_source(self, source_id: str) -> None:
         self.collection.delete(where={"source_id": source_id})

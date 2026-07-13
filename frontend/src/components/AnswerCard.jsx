@@ -2,25 +2,28 @@ import { BadgeCheck, Quote, AlertCircle, FileText, Globe2, Copy, Video, GitBranc
 import { useState } from "react";
 
 function getConfidenceBadgeColor(score) {
+  if (score == null) return "bg-slate-50 text-slate-500 border-slate-200";
   if (score >= 0.7) return "bg-emerald-50 text-emerald-700 border-emerald-200";
   if (score >= 0.4) return "bg-amber-50 text-amber-700 border-amber-200";
   return "bg-rose-50 text-rose-700 border-rose-200";
 }
 
 function getConfidenceLabel(score) {
+  if (score == null) return "Unknown";
   if (score >= 0.7) return "High";
   if (score >= 0.4) return "Medium";
   return "Low";
 }
 
-export default function AnswerCard({ answer }) {
+export default function AnswerCard({ answer, streaming = false, onAskFollowUp = null }) {
   const [copyMessage, setCopyMessage] = useState(null);
 
   if (!answer) return null;
 
+  const hasConfidenceScore = typeof answer.confidence_score === "number";
   const confidenceLabel = getConfidenceLabel(answer.confidence_score);
-  const confidencePercent = Math.round(answer.confidence_score * 100);
-  const showLowConfidenceWarning = answer.confidence_score < 0.4;
+  const confidencePercent = hasConfidenceScore ? Math.round(answer.confidence_score * 100) : null;
+  const showLowConfidenceWarning = hasConfidenceScore && answer.confidence_score < 0.4;
 
   async function copyAnswer() {
     try {
@@ -43,9 +46,9 @@ export default function AnswerCard({ answer }) {
             </h3>
           </div>
           <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${getConfidenceBadgeColor(answer.confidence_score)}`}>
-            <BadgeCheck size={16} /> 
+            <BadgeCheck size={16} />
             <span>{confidenceLabel} Confidence</span>
-            <span className="text-xs font-normal">({confidencePercent}%)</span>
+            {confidencePercent !== null && <span className="text-xs font-normal">({confidencePercent}%)</span>}
           </div>
         </div>
 
@@ -60,12 +63,25 @@ export default function AnswerCard({ answer }) {
           )}
         </div>
 
-        <div className="whitespace-pre-wrap leading-7 text-slate-800 mb-4">{answer.answer}</div>
+        <div className="whitespace-pre-wrap leading-7 text-slate-800 mb-4">
+          {answer.answer}
+          {streaming && <span className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-indigo-500" aria-hidden="true" />}
+        </div>
 
         {answer.follow_up_question && (
           <div className="mb-4 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
             <p className="font-semibold">Suggested follow-up</p>
-            <p className="mt-1">{answer.follow_up_question}</p>
+            {onAskFollowUp ? (
+              <button
+                type="button"
+                onClick={() => onAskFollowUp(answer.follow_up_question)}
+                className="mt-1 text-left underline decoration-dotted underline-offset-2 hover:text-indigo-700"
+              >
+                {answer.follow_up_question}
+              </button>
+            ) : (
+              <p className="mt-1">{answer.follow_up_question}</p>
+            )}
           </div>
         )}
 
@@ -109,17 +125,19 @@ export default function AnswerCard({ answer }) {
           </div>
 
           <div className="grid gap-3">
-            {answer.citations.map((citation) => (
-              <div key={citation.citation_id} className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4 hover:border-slate-300 transition">
+            {answer.citations.map((citation, idx) => (
+              <div key={citation.citation_id ?? idx} className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4 hover:border-slate-300 transition">
                 {/* Citation Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-600 text-white text-xs font-bold">
-                      {citation.citation_id.replace("[", "").replace("]", "")}
+                      {citation.citation_id ? citation.citation_id.replace("[", "").replace("]", "") : idx + 1}
                     </span>
-                    <span className="text-xs font-semibold text-slate-500 uppercase">
-                      Retrieval score {(citation.score * 100).toFixed(0)}%
-                    </span>
+                    {typeof citation.score === "number" && (
+                      <span className="text-xs font-semibold text-slate-500 uppercase">
+                        Retrieval score {(citation.score * 100).toFixed(0)}%
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -212,35 +230,37 @@ export default function AnswerCard({ answer }) {
         </section>
       )}
 
-      {(!answer.citations || answer.citations.length === 0) && answer.retrieved_sources && answer.retrieved_sources.length > 0 ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <Quote size={18} className="text-indigo-600" />
-            <h3 className="text-lg font-bold text-slate-950">Retrieved Evidence (no formal citations)</h3>
-            <span className="ml-auto text-xs font-semibold text-slate-500">{answer.retrieved_sources.length} chunks</span>
-          </div>
-          <div className="grid gap-3">
-            {answer.retrieved_sources.map((r, idx) => (
-              <div key={idx} className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-sm mb-2">
-                  <Video size={14} className="text-emerald-600" />
-                  <span className="font-medium text-slate-800">{r.source_title || r.source_ref}</span>
-                </div>
-                {r.timestamp_label && (
-                  <div className="ml-6 flex items-center gap-2 text-xs text-slate-600 mb-2">
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">{r.timestamp_label}</span>
-                    {r.video_id && r.start_time !== undefined && (
-                      <a href={`https://www.youtube.com/watch?v=${r.video_id}&t=${Math.max(0, Math.floor(Number(r.start_time)))}s`} target="_blank" rel="noreferrer" className="rounded-full bg-slate-100 px-2 py-1 text-slate-700 hover:bg-slate-200">Open at timestamp</a>
-                    )}
+      {!(answer.citations && answer.citations.length > 0) && (
+        answer.retrieved_sources && answer.retrieved_sources.length > 0 ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Quote size={18} className="text-indigo-600" />
+              <h3 className="text-lg font-bold text-slate-950">Retrieved Evidence (no formal citations)</h3>
+              <span className="ml-auto text-xs font-semibold text-slate-500">{answer.retrieved_sources.length} chunks</span>
+            </div>
+            <div className="grid gap-3">
+              {answer.retrieved_sources.map((r, idx) => (
+                <div key={idx} className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4">
+                  <div className="flex items-center gap-2 text-sm mb-2">
+                    <Video size={14} className="text-emerald-600" />
+                    <span className="font-medium text-slate-800">{r.source_title || r.source_ref}</span>
                   </div>
-                )}
-                <div className="ml-6 text-sm text-slate-700">{r.snippet}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : (
-        <section className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">No citations found.</section>
+                  {r.timestamp_label && (
+                    <div className="ml-6 flex items-center gap-2 text-xs text-slate-600 mb-2">
+                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">{r.timestamp_label}</span>
+                      {r.video_id && r.start_time !== undefined && (
+                        <a href={`https://www.youtube.com/watch?v=${r.video_id}&t=${Math.max(0, Math.floor(Number(r.start_time)))}s`} target="_blank" rel="noreferrer" className="rounded-full bg-slate-100 px-2 py-1 text-slate-700 hover:bg-slate-200">Open at timestamp</a>
+                      )}
+                    </div>
+                  )}
+                  <div className="ml-6 text-sm text-slate-700">{r.snippet}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">No citations found.</section>
+        )
       )}
     </div>
   );

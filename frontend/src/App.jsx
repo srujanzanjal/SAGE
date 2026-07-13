@@ -1,9 +1,10 @@
 import { ArrowLeft, BrainCircuit } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ChatPanel from "./components/ChatPanel";
 import LandingPage from "./components/LandingPage";
 import SourceIngestPanel from "./components/SourceIngestPanel";
 import SourceList from "./components/SourceList";
+import SummaryCard from "./components/SummaryCard";
 import { deleteKnowledgebase, deleteSource, getJobStatus, listSources, recrawlWebsite } from "./lib/api";
 
 const MODULES = {
@@ -32,6 +33,11 @@ export default function App() {
   const [selectedType, setSelectedType] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const unmountedRef = useRef(false);
+
+  useEffect(() => () => {
+    unmountedRef.current = true;
+  }, []);
 
   const filteredSources = useMemo(
     () => sources.filter((source) => source.source_type === selectedType),
@@ -187,13 +193,14 @@ export default function App() {
   }
 
   async function waitForJob(jobId) {
-    while (true) {
+    while (!unmountedRef.current) {
       const job = await getJobStatus(jobId);
-      if (job.status === "completed" || job.status === "failed") {
+      if (unmountedRef.current || job.status === "completed" || job.status === "failed") {
         return job;
       }
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
+    return null;
   }
 
   async function handleRecrawlSource(source) {
@@ -205,6 +212,7 @@ export default function App() {
     try {
       const job = await recrawlWebsite({ knowledgebase_id: source.knowledgebase_id, max_pages: 10, max_depth: 1 });
       const finalJob = await waitForJob(job.job_id);
+      if (unmountedRef.current || !finalJob) return;
       if (finalJob.status === "completed") {
         setActionMessage({ type: "success", text: `Re-crawl complete: ${finalJob.result?.crawl_summary?.pages_successfully_ingested || 0} pages, ${finalJob.result?.crawl_summary?.total_chunks_created || 0} chunks.` });
         await refreshSources();
@@ -212,9 +220,9 @@ export default function App() {
         setActionMessage({ type: "error", text: finalJob.error || finalJob.message || "Re-crawl failed." });
       }
     } catch (error) {
-      setActionMessage({ type: "error", text: error.message });
+      if (!unmountedRef.current) setActionMessage({ type: "error", text: error.message });
     } finally {
-      setActionLoading(false);
+      if (!unmountedRef.current) setActionLoading(false);
     }
   }
 
@@ -324,7 +332,9 @@ export default function App() {
               />
             </div>
 
-            <ChatPanel selectedSource={selectedSource} />
+            <SummaryCard source={selectedSource} />
+
+            <ChatPanel selectedSource={selectedSource} allSources={sources} />
           </div>
         </div>
       </div>

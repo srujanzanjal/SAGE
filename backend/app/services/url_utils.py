@@ -1,7 +1,44 @@
+import ipaddress
+import socket
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+from app.utils.exceptions import UnsafeUrlError
 
 TRACKING_PREFIXES = ("utm_",)
 TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid", "igshid"}
+
+# Blocks the classic SSRF targets: loopback, private/RFC1918, link-local
+# (this covers the 169.254.169.254 cloud metadata address), and friends.
+_BLOCKED_HOSTNAMES = {"metadata.google.internal"}
+
+
+def assert_public_http_url(url: str) -> None:
+    """Raise UnsafeUrlError if `url` doesn't resolve to a public, fetchable address.
+
+    Guards against SSRF: a user-supplied ingestion URL that points at the
+    local machine, an internal network address, or a cloud metadata endpoint.
+    """
+    parsed = urlparse(str(url).strip())
+    if parsed.scheme not in ("http", "https"):
+        raise UnsafeUrlError(f"Unsupported URL scheme: {parsed.scheme or '(none)'}. Use http or https.")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise UnsafeUrlError("URL has no hostname.")
+    if hostname.lower() in _BLOCKED_HOSTNAMES:
+        raise UnsafeUrlError(f"Refusing to fetch blocked host: {hostname}")
+
+    try:
+        resolved = socket.getaddrinfo(hostname, None)
+    except socket.gaierror as exc:
+        raise UnsafeUrlError(f"Could not resolve host: {hostname}") from exc
+
+    for _family, _type, _proto, _canonname, sockaddr in resolved:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            raise UnsafeUrlError(
+                f"Refusing to fetch {hostname}: it resolves to a non-public address ({ip})."
+            )
 
 
 def normalize_url(url: str) -> str:

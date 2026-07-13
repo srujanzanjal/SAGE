@@ -1,5 +1,5 @@
 import { FileText, Globe2, Loader2, Upload, ChevronLeft, Video, GitBranch } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, getJobStatus, listSources, startPdfIngestJob, startVideoAutoTranscribeJob, startVideoIngestJob, startWebsiteIngestJob, startGithubIngestJob } from "../lib/api";
 
 export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) {
@@ -12,16 +12,26 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
   const [message, setMessage] = useState(null);
   const [jobState, setJobState] = useState(null);
   const [videoFallback, setVideoFallback] = useState(null);
+  const unmountedRef = useRef(false);
+
+  // Stop polling and stop touching state once the user navigates away
+  // (e.g. clicks "Go Back") mid-ingest. The job itself keeps running on the
+  // server; we just stop watching it from an unmounted component.
+  useEffect(() => () => {
+    unmountedRef.current = true;
+  }, []);
 
   async function waitForJob(jobId) {
-    while (true) {
+    while (!unmountedRef.current) {
       const job = await getJobStatus(jobId);
+      if (unmountedRef.current) return job;
       setJobState(job);
       if (job.status === "completed" || job.status === "failed") {
         return job;
       }
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
+    return null;
   }
 
   async function handleWebsiteSubmit(event) {
@@ -32,6 +42,7 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
     try {
       const job = await startWebsiteIngestJob(url, maxPages, maxDepth);
       const finalJob = await waitForJob(job.job_id);
+      if (unmountedRef.current || !finalJob) return;
       if (finalJob.status === "completed") {
         const result = finalJob.result;
         setUrl("");
@@ -45,9 +56,9 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
         setMessage({ type: "error", text: errorText });
       }
     } catch (error) {
-      setMessage({ type: "error", text: error.message });
+      if (!unmountedRef.current) setMessage({ type: "error", text: error.message });
     } finally {
-      setLoading(null);
+      if (!unmountedRef.current) setLoading(null);
     }
   }
 
@@ -60,6 +71,7 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
     try {
       const job = await startPdfIngestJob(file);
       const finalJob = await waitForJob(job.job_id);
+      if (unmountedRef.current || !finalJob) return;
       if (finalJob.status === "completed") {
         const result = finalJob.result;
         setFile(null);
@@ -70,9 +82,9 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
         setMessage({ type: "error", text: finalJob.error || finalJob.message || "PDF ingestion failed." });
       }
     } catch (error) {
-      setMessage({ type: "error", text: error.message });
+      if (!unmountedRef.current) setMessage({ type: "error", text: error.message });
     } finally {
-      setLoading(null);
+      if (!unmountedRef.current) setLoading(null);
     }
   }
 
@@ -120,6 +132,7 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
     try {
       const job = await startVideoIngestJob(url);
       const finalJob = await waitForJob(job.job_id);
+      if (unmountedRef.current || !finalJob) return;
       if (finalJob.status === "completed") {
         const result = finalJob.result;
         setUrl("");
@@ -141,6 +154,7 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
         }
       }
     } catch (error) {
+      if (unmountedRef.current) return;
       if (error instanceof ApiError && error.code === "TRANSCRIPT_NOT_AVAILABLE") {
         setVideoFallback({
           url,
@@ -150,7 +164,7 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
       }
       setMessage({ type: "error", text: error.message });
     } finally {
-      setLoading(null);
+      if (!unmountedRef.current) setLoading(null);
     }
   }
 
@@ -197,6 +211,7 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
     try {
       const job = await startVideoAutoTranscribeJob(fallbackUrl);
       const finalJob = await waitForJob(job.job_id);
+      if (unmountedRef.current || !finalJob) return;
       if (finalJob.status === "completed") {
         const result = finalJob.result;
         setUrl("");
@@ -211,9 +226,9 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
         setMessage({ type: "error", text: errorText });
       }
     } catch (error) {
-      setMessage({ type: "error", text: error.message });
+      if (!unmountedRef.current) setMessage({ type: "error", text: error.message });
     } finally {
-      setLoading(null);
+      if (!unmountedRef.current) setLoading(null);
     }
   }
 
@@ -225,6 +240,7 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
     try {
       const job = await startGithubIngestJob(url, branch.trim() || null);
       const finalJob = await waitForJob(job.job_id);
+      if (unmountedRef.current || !finalJob) return;
       if (finalJob.status === "completed") {
         const result = finalJob.result;
         setUrl("");
@@ -235,9 +251,9 @@ export default function SourceIngestPanel({ sourceType, onIngested, onGoBack }) 
         setMessage({ type: "error", text: finalJob.error || finalJob.message || "GitHub ingestion failed." });
       }
     } catch (error) {
-      setMessage({ type: "error", text: error.message });
+      if (!unmountedRef.current) setMessage({ type: "error", text: error.message });
     } finally {
-      setLoading(null);
+      if (!unmountedRef.current) setLoading(null);
     }
   }
 

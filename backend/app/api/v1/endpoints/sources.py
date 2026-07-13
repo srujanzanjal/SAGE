@@ -1,6 +1,13 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import KnowledgebaseDetail, KnowledgebaseGroup, RecrawlRequest, SourceDetail, SourceSummary
+from app.models.schemas import (
+    KnowledgebaseDetail,
+    KnowledgebaseGroup,
+    RecrawlRequest,
+    SourceDetail,
+    SourceOverviewResponse,
+    SourceSummary,
+)
 from app.services.ingestion_jobs import start_website_recrawl_job
 from app.services.source_management import (
     delete_knowledgebase,
@@ -10,6 +17,7 @@ from app.services.source_management import (
     list_sources_grouped,
 )
 from app.services.supabase_repo import SupabaseRepository
+from app.services.vector_store import get_vector_store
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -68,6 +76,14 @@ def get_source_detail_endpoint(source_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Could not load source details: {exc}") from exc
+
+
+@router.get("/{source_id}/summary", response_model=SourceOverviewResponse)
+def get_source_summary_endpoint(source_id: str):
+    try:
+        return SourceOverviewResponse(summary=get_vector_store().get_overview_text(source_id))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not load source summary: {exc}") from exc
 
 
 @router.get("/knowledgebases/{knowledgebase_id}", response_model=KnowledgebaseDetail)
