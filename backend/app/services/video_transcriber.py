@@ -139,7 +139,11 @@ def transcribe_youtube_video(url: str, progress_callback: ProgressCallback | Non
                     model = None
             if model is None:
                 raise last_error or RuntimeError("Could not initialize WhisperModel")
-            transcript_stream, _ = model.transcribe(str(audio_file), beam_size=1, vad_filter=True)
+            # task="translate" makes Whisper output English text directly regardless
+            # of the spoken language, so auto-transcribed videos land in the same
+            # working language as YouTube-caption transcripts (which are translated
+            # to English when possible) rather than sometimes being non-English.
+            transcript_stream, _ = model.transcribe(str(audio_file), beam_size=1, vad_filter=True, task="translate")
         except Exception as exc:
             raise VideoAutoTranscriptionError("Audio transcription failed.", error_code="TRANSCRIPTION_FAILED") from exc
 

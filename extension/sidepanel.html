@@ -9,16 +9,18 @@
   <body>
     <main class="app-shell">
       <header class="hero">
+        <button id="settings-toggle" class="icon-button" type="button" title="Settings" aria-label="Settings">⚙</button>
         <div class="eyebrow">SAGE Extension</div>
-        <h1>Website Side Panel</h1>
-        <p>Analyze the current website with source-grounded answers from your local SAGE backend.</p>
+        <h1>Side Panel</h1>
+        <p>Reads your current tab and analyzes it as a website, YouTube video, or GitHub repository.</p>
+        <div id="tab-detected" class="tab-detected"></div>
       </header>
 
-      <section class="panel config-panel">
+      <section id="settings-panel" class="panel config-panel hidden">
         <div class="panel-header">
           <div>
-            <h2>Backend</h2>
-            <p>Start the backend with <code>cd backend && python run.py</code>. Only a localhost/127.0.0.1 backend is supported.</p>
+            <h2>Settings</h2>
+            <p>Only a localhost/127.0.0.1 backend is supported. Start it with <code>cd backend && python run.py</code>.</p>
           </div>
         </div>
         <label class="field">
@@ -32,54 +34,48 @@
         <p id="backend-status" class="qa-status"></p>
       </section>
 
-      <section class="panel tab-panel">
+      <section id="ingest-panel" class="panel ingest-panel">
         <div class="panel-header">
           <div>
-            <h2>Current tab</h2>
-            <p id="tab-summary">Detecting active tab...</p>
+            <h2 id="ingest-title">Crawl Website</h2>
+            <p id="ingest-help">Detected automatically from your current tab.</p>
           </div>
-          <button id="refresh-tab" class="button secondary">Refresh</button>
         </div>
-        <div class="tab-card">
-          <div class="badge" id="tab-type">Unsupported</div>
-          <div class="tab-title" id="tab-title">No tab selected</div>
-          <div class="tab-url" id="tab-url"></div>
-        </div>
-        <button id="use-current-tab" class="button">Use current website</button>
-      </section>
 
-      <section class="panel ingest-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Crawl Website</h2>
-            <p id="ingest-help">Only normal website pages are supported inside the extension.</p>
+        <div id="ingest-form">
+          <label class="field url-field">
+            <span id="source-url-label">Website URL</span>
+            <div class="url-row">
+              <input id="source-url" type="url" spellcheck="false" placeholder="https://www.python.org/about/" />
+              <button id="use-current-tab" class="button secondary use-tab-button" type="button" title="Fill in the active tab's URL">Use tab</button>
+            </div>
+          </label>
+          <label id="github-branch-field" class="field hidden">
+            <span>Branch (optional)</span>
+            <input id="github-branch" type="text" spellcheck="false" placeholder="main" />
+          </label>
+          <button id="ingest-button" class="button primary">Crawl website</button>
+          <div id="video-fallback" class="video-fallback hidden">
+            <p>Captions aren't available for this video.</p>
+            <button id="video-auto-button" class="button secondary" type="button">Generate transcript automatically</button>
           </div>
         </div>
-        <label class="field url-field">
-          <span>Website URL</span>
-          <input id="source-url" type="url" spellcheck="false" placeholder="https://www.python.org/about/" />
-        </label>
-        <div class="grid-two">
-          <label class="field">
-            <span>Max pages</span>
-            <input id="max-pages" type="number" min="1" max="100" value="10" />
-          </label>
-          <label class="field">
-            <span>Max depth</span>
-            <input id="max-depth" type="number" min="1" max="3" value="1" />
-          </label>
+
+        <div id="unsupported-notice" class="unsupported-notice hidden">
+          <p>This page type isn't supported for ingestion yet. Open the main SAGE app for PDFs and other sources.</p>
         </div>
-        <button id="ingest-button" class="button primary">Crawl website</button>
+
         <div id="ingest-progress" class="progress hidden">
           <div class="progress-bar"><div id="ingest-progress-fill" class="progress-fill"></div></div>
           <p id="ingest-progress-label"></p>
         </div>
+        <p id="ingest-status" class="qa-status"></p>
       </section>
 
       <section class="panel sources-panel">
         <div class="panel-header">
           <div>
-            <h2>Website Sources</h2>
+            <h2 id="sources-title">Website Sources</h2>
             <p>Select one or more sources to ask questions across.</p>
           </div>
           <button id="refresh-sources" class="button secondary">Refresh</button>
@@ -100,21 +96,15 @@
 
         <label class="field">
           <span>Question</span>
-          <textarea id="question" rows="3" placeholder="What does this website say about...? "></textarea>
+          <textarea id="question" rows="3" placeholder="Ask something about the selected source(s)..."></textarea>
         </label>
-        <div class="grid-two">
-          <label class="field">
-            <span>Mode</span>
-            <select id="qa-mode">
-              <option value="grounded">Grounded</option>
-              <option value="exploratory">Exploratory</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Top K</span>
-            <input id="top-k" type="number" min="1" max="12" value="6" />
-          </label>
-        </div>
+        <label class="field">
+          <span>Mode</span>
+          <select id="qa-mode">
+            <option value="grounded">Grounded</option>
+            <option value="exploratory">Exploratory</option>
+          </select>
+        </label>
         <button id="ask-button" class="button primary">Ask question</button>
         <p id="qa-status" class="qa-status"></p>
       </section>

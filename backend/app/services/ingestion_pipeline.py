@@ -23,6 +23,7 @@ from app.services.vector_store import get_vector_store
 from app.services.web_scraper import extract_website_text
 from app.services.website_crawler import crawl_website
 from app.services.text_utils import estimate_tokens
+from app.services.translation import translate_if_needed
 from app.services.video_transcript import canonical_youtube_url, extract_video_id, extract_youtube_transcript, chunk_video_transcript
 from app.services.video_transcriber import transcribe_youtube_video
 from app.services.video_transcript import TranscriptLine
@@ -480,7 +481,33 @@ def crawl_website_ingest(
         raise WebsiteNoUsableTextError()
 
     _report(progress_callback, "extracting", 35, "Extracting rendered content")
-    
+
+    _report(progress_callback, "translating", 45, "Checking language and translating if needed")
+    translated_languages: set[str] = set()
+    failed_languages: set[str] = set()
+    truncated_languages: set[str] = set()
+    for page in crawled_pages:
+        translated_text, source_language, segments_ok, truncated = translate_if_needed(page.text)
+        if source_language:
+            page.text = translated_text
+            (translated_languages if segments_ok else failed_languages).add(source_language)
+            if truncated:
+                truncated_languages.add(source_language)
+    if translated_languages:
+        crawl_summary.warnings.append(
+            f"Translated content from {', '.join(sorted(translated_languages))} to English before indexing."
+        )
+    if failed_languages:
+        crawl_summary.warnings.append(
+            f"Detected non-English content ({', '.join(sorted(failed_languages))}) but translation failed "
+            "(provider error); this content remains in its original language."
+        )
+    if truncated_languages:
+        crawl_summary.warnings.append(
+            f"Some pages ({', '.join(sorted(truncated_languages))}) were long enough that only the first "
+            "~20,000 characters were translated; the remainder was left in its original language."
+        )
+
     # Create a knowledgebase for the crawl
     canonical_ref = crawl_summary.normalized_url
     existing_kb = repo.get_knowledgebase_by_canonical_ref(canonical_ref)
@@ -922,6 +949,35 @@ def ingest_pdf(
     title = extraction.title
     kb = existing_kb or repo.create_knowledgebase(name=title, source_type="pdf", canonical_ref=canonical_ref)
     kb_id = kb["id"]
+
+    _report(progress_callback, "translating", 30, "Checking language and translating if needed")
+    translated_pages: list[tuple[int, str]] = []
+    translated_languages: set[str] = set()
+    failed_languages: set[str] = set()
+    truncated_languages: set[str] = set()
+    for page_number, page_text in extraction.pages:
+        translated_text, source_language, segments_ok, truncated = translate_if_needed(page_text)
+        if source_language:
+            (translated_languages if segments_ok else failed_languages).add(source_language)
+            if truncated:
+                truncated_languages.add(source_language)
+        translated_pages.append((page_number, translated_text))
+    extraction.pages = translated_pages
+    extraction.text = "\n\n".join(text for _, text in translated_pages)
+    if translated_languages:
+        extraction.warnings.append(
+            f"Translated content from {', '.join(sorted(translated_languages))} to English before indexing."
+        )
+    if failed_languages:
+        extraction.warnings.append(
+            f"Detected non-English content ({', '.join(sorted(failed_languages))}) but translation failed "
+            "(provider error); this content remains in its original language."
+        )
+    if truncated_languages:
+        extraction.warnings.append(
+            f"Some pages ({', '.join(sorted(truncated_languages))}) were long enough that only the first "
+            "~20,000 characters were translated; the remainder was left in its original language."
+        )
 
     try:
         source = repo.create_source(

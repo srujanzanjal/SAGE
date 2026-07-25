@@ -40,13 +40,13 @@ export default function LandingPage({ onSelectType }) {
     <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl items-center">
         <div className="w-full space-y-8">
-          <section className="overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/75 p-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.35)] backdrop-blur sm:p-8 lg:p-10">
+          <section className="overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/75 p-5 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.35)] backdrop-blur sm:p-6 lg:p-8">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-center">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-indigo-700">
                   <BrainCircuit size={14} /> SAGE source-grounded AI
                 </div>
-                <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+                <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
                   Ask grounded questions over websites, documents, videos, and GitHub repos.
                 </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">

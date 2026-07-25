@@ -240,8 +240,8 @@ export default function App() {
                 <BrainCircuit size={30} />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-600">SAGE v1.5</p>
-                <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Final UI Polish + Chrome Side Panel</h1>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-600">SAGE · Source-Grounded AI</p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Semantic Analysis and Generation Engine</h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
                   {currentModule?.subtitle || "Choose a source, ingest it, and ask grounded questions with citations."}
                 </p>

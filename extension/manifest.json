@@ -1,17 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "SAGE Website Side Panel",
-  "description": "Analyze the current website with the local SAGE backend.",
-  "version": "1.6.0",
+  "name": "SAGE Side Panel",
+  "description": "Reads your current tab and analyzes it with the local SAGE backend as a website, YouTube video, or GitHub repository.",
+  "version": "1.7.0",
   "minimum_chrome_version": "114",
   "action": {
-    "default_title": "Open SAGE Website Panel"
+    "default_title": "Open SAGE Side Panel"
   },
   "background": {
     "service_worker": "service_worker.js"
   },
   "permissions": [
     "activeTab",
+    "tabs",
     "sidePanel",
     "storage"
   ],
