@@ -54,6 +54,7 @@ class FakeRepo:
         self.deleted_sources: list[str] = []
         self.deleted_kbs: list[str] = []
         self.updated_status: list[tuple[str, str]] = []
+        self.deleted_query_history: list[str] = []
 
     def list_knowledgebases(self, limit: int = 100):
         return list(self.kbs.values())
@@ -78,6 +79,12 @@ class FakeRepo:
 
     def get_chunks_count_for_knowledgebase(self, knowledgebase_id: str):
         return 4
+
+    def delete_query_history_for_source(self, source_id: str):
+        self.deleted_query_history.append(f"source:{source_id}")
+
+    def delete_query_history_for_knowledgebase(self, knowledgebase_id: str):
+        self.deleted_query_history.append(f"knowledgebase:{knowledgebase_id}")
 
     def delete_source_chunks(self, source_id: str):
         self.deleted_sources.append(f"chunks:{source_id}")

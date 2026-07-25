@@ -58,6 +58,29 @@ button {
 .hero {
   border-radius: 24px;
   padding: 18px;
+  position: relative;
+}
+
+.icon-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--muted);
+  font-size: 15px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.icon-button:hover {
+  color: var(--ink);
+  transform: rotate(20deg);
 }
 
 .eyebrow {
@@ -84,6 +107,52 @@ button {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;
+}
+
+.tab-detected {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(5, 150, 105, 0.12);
+  color: var(--success);
+}
+
+.tab-detected:empty {
+  display: none;
+}
+
+.video-fallback {
+  margin-top: 14px;
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(180, 83, 9, 0.08);
+  border: 1px solid rgba(180, 83, 9, 0.2);
+}
+
+.video-fallback p {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--warning);
+}
+
+.unsupported-notice {
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+.unsupported-notice p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .panel {
@@ -178,69 +247,28 @@ textarea {
   border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
-.grid-two {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.url-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: rgba(148, 163, 184, 0.14);
-  color: #334155;
+.url-row input {
+  flex: 1;
+  min-width: 0;
 }
 
-.badge.website {
-  background: rgba(14, 165, 233, 0.12);
-  color: #0369a1;
-}
-
-.badge.github {
-  background: rgba(15, 23, 42, 0.1);
-  color: #0f172a;
-}
-
-.badge.video {
-  background: rgba(16, 185, 129, 0.12);
-  color: #047857;
-}
-
-.badge.pdf {
-  background: rgba(139, 92, 246, 0.14);
-  color: #6d28d9;
-}
-
-.tab-card {
-  border-radius: 18px;
-  padding: 14px;
-  background: rgba(248, 250, 252, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.tab-title {
-  margin-top: 10px;
-  font-size: 15px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.tab-url {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--muted);
-  word-break: break-all;
+.use-tab-button {
+  width: auto;
+  flex-shrink: 0;
+  padding: 0 14px;
+  font-size: 13px;
 }
 
 .action-row {
   margin-top: 12px;
+  display: flex;
+  gap: 8px;
 }
 
 .sources-list {
@@ -486,10 +514,6 @@ textarea {
 }
 
 @media (max-width: 420px) {
-  .grid-two {
-    grid-template-columns: 1fr;
-  }
-
   .panel-header {
     flex-direction: column;
   }

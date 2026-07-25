@@ -82,7 +82,7 @@ def _install_fake_modules(monkeypatch, *, duration: float = 120.0):
             self.model_name = model_name
             self.compute_type = compute_type
 
-        def transcribe(self, audio_path, beam_size=1, vad_filter=True):
+        def transcribe(self, audio_path, beam_size=1, vad_filter=True, task="transcribe"):
             segments = [
                 types.SimpleNamespace(text="Hello there", start=0.0, end=2.0),
                 types.SimpleNamespace(text="General Kenobi", start=2.0, end=4.0),

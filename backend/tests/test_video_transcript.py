@@ -254,7 +254,8 @@ def test_video_ingestion_pipeline(monkeypatch):
     assert result.source_type == "video"
     assert result.video_id == "abcdefghijk"
     assert result.transcript_duration == 120.0
-    assert result.chunks_count == 1
+    # 1 transcript chunk from the fake response + 1 deterministic source-overview chunk.
+    assert result.chunks_count == 2
     assert fake_vectors.last_upsert is not None
     assert fake_vectors.last_upsert["source_type"] == "video"
 
@@ -285,15 +286,15 @@ def test_qa_over_video_transcript_includes_timestamp_label(monkeypatch):
             return [0.1]
 
     class FakeLLM:
-        def rewrite_query(self, question: str):
+        def rewrite_query(self, question: str, history=None):
             return question
 
-        def generate_answer(self, question: str, context: str, mode: str):
+        def generate_answer(self, question: str, context: str, mode: str, history=None):
             return "Answer from video transcript."
 
-    monkeypatch.setattr(qa_pipeline, "SupabaseRepository", lambda: fake_repo)
+    monkeypatch.setattr(qa_pipeline, "get_supabase_repository", lambda: fake_repo)
     monkeypatch.setattr(qa_pipeline, "get_embedding_service", lambda: FakeEmbeddingService())
-    monkeypatch.setattr(qa_pipeline, "LLMService", lambda: FakeLLM())
+    monkeypatch.setattr(qa_pipeline, "get_llm_service", lambda: FakeLLM())
     monkeypatch.setattr(qa_pipeline, "should_rewrite", lambda question: False)
     monkeypatch.setattr(qa_pipeline, "rerank_chunks", lambda rewritten_query, chunks: chunks)
     monkeypatch.setattr(qa_pipeline, "get_vector_store", lambda: FakeVectorStore([fake_chunk]))
@@ -339,15 +340,15 @@ def test_qa_low_confidence_returns_follow_up_question(monkeypatch):
             return [0.1]
 
     class FakeLLM:
-        def rewrite_query(self, question: str):
+        def rewrite_query(self, question: str, history=None):
             return question
 
-        def generate_answer(self, question: str, context: str, mode: str):
+        def generate_answer(self, question: str, context: str, mode: str, history=None):
             return "Should not be used for low confidence."
 
-    monkeypatch.setattr(qa_pipeline, "SupabaseRepository", lambda: fake_repo)
+    monkeypatch.setattr(qa_pipeline, "get_supabase_repository", lambda: fake_repo)
     monkeypatch.setattr(qa_pipeline, "get_embedding_service", lambda: FakeEmbeddingService())
-    monkeypatch.setattr(qa_pipeline, "LLMService", lambda: FakeLLM())
+    monkeypatch.setattr(qa_pipeline, "get_llm_service", lambda: FakeLLM())
     monkeypatch.setattr(qa_pipeline, "should_rewrite", lambda question: False)
     monkeypatch.setattr(qa_pipeline, "rerank_chunks", lambda rewritten_query, chunks: chunks)
     monkeypatch.setattr(qa_pipeline, "get_vector_store", lambda: FakeVectorStore([fake_chunk]))
@@ -361,9 +362,11 @@ def test_qa_low_confidence_returns_follow_up_question(monkeypatch):
         )
     )
 
-    assert result.answer.startswith("I couldn't produce a reliable grounded answer")
-    assert result.follow_up_question is not None
-    assert "summary" in result.follow_up_question.lower()
+    # Video sources are exempted from the hard low-confidence refusal: the answer is
+    # still generated, flagged with a warning instead of being replaced by a refusal.
+    assert result.answer == "Should not be used for low confidence."
+    assert any("low confidence" in w.lower() for w in result.warnings)
+    assert result.follow_up_question is None
 
 
 def test_source_listing_includes_video_source(client, monkeypatch):

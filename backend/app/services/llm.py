@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import lru_cache
 
 import groq
@@ -7,6 +8,17 @@ from app.core.config import get_settings
 
 
 logger = logging.getLogger(__name__)
+
+# Kept conservative because low-tier Groq accounts can have quite small
+# tokens-per-minute budgets (observed as low as 6000 TPM) shared across input
+# and output -- a handful of oversized segments back-to-back can blow that
+# budget even though each individual call looks modest on its own.
+TRANSLATION_SEGMENT_MAX_CHARS = 3000
+TRANSLATION_MAX_OUTPUT_TOKENS = 1500
+# Bounds worst-case ingestion latency for a single huge page: beyond this,
+# the page is translated up to the cap and left in its original language
+# after that, rather than risking a very long chain of sequential calls.
+TRANSLATION_MAX_TOTAL_CHARS = 20000
 
 
 class LLMServiceTimeoutError(RuntimeError):
@@ -146,6 +158,110 @@ Question:
             if self._is_transient_provider_error(exc):
                 self._raise_timeout_error(exc)
             raise
+
+    def translate_to_english(self, text: str, source_language: str | None = None) -> tuple[str, bool, bool]:
+        """Translate arbitrary ingested text to English, one small segment at a
+        time so long pages/documents aren't silently truncated or sent as a
+        single oversized request. Returns (text, segments_ok, truncated).
+        segments_ok is False if any attempted segment fell back to its
+        original text (e.g. a provider error) -- distinct from truncated,
+        which just means the page was longer than
+        TRANSLATION_MAX_TOTAL_CHARS and the remainder was left untranslated to
+        bound worst-case ingestion latency. Callers should treat these as two
+        different situations to report to the user, not conflate them."""
+        truncated = len(text) > TRANSLATION_MAX_TOTAL_CHARS
+        head, tail = text[:TRANSLATION_MAX_TOTAL_CHARS], text[TRANSLATION_MAX_TOTAL_CHARS:]
+
+        segments = _split_for_translation(head, max_chars=TRANSLATION_SEGMENT_MAX_CHARS)
+        translated_segments = []
+        all_ok = True
+        for segment in segments:
+            translated, ok = self._translate_segment(segment, source_language)
+            translated_segments.append(translated)
+            all_ok = all_ok and ok
+
+        result = "\n\n".join(translated_segments)
+        if truncated:
+            result = f"{result}\n\n{tail}"
+        return result, all_ok, truncated
+
+    def _translate_segment(self, segment: str, source_language: str | None, _retried: bool = False) -> tuple[str, bool]:
+        language_hint = f" The source language code is '{source_language}'." if source_language else ""
+        system_prompt = (
+            "You are a precise translation engine. Translate the user's text to English."
+            f"{language_hint} Preserve meaning, structure, technical terms, and formatting as "
+            "closely as possible. Do not summarize, omit, or add commentary or explanations. "
+            "Return only the translated text."
+        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.settings.groq_model,
+                temperature=0.0,
+                max_tokens=TRANSLATION_MAX_OUTPUT_TOKENS,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": segment},
+                ],
+                timeout=self.settings.llm_timeout_seconds,
+            )
+            translated = (response.choices[0].message.content or "").strip()
+            return (translated, True) if translated else (segment, False)
+        except groq.RateLimitError as exc:
+            # A cumulative per-minute token budget, not a too-large single
+            # request (that's fixed by segment sizing above) -- one short
+            # wait-and-retry recovers cleanly from bursts of several segments
+            # landing in the same window.
+            if not _retried:
+                logger.warning("Translation hit a rate limit, retrying once after a short wait: %s", exc)
+                time.sleep(20)
+                return self._translate_segment(segment, source_language, _retried=True)
+            logger.warning("Translation segment still rate-limited after retry, keeping original text: %s", exc)
+            return segment, False
+        except Exception as exc:
+            logger.warning("Translation segment failed, keeping original text: %s", exc)
+            return segment, False
+
+
+def _split_for_translation(text: str, max_chars: int) -> list[str]:
+    """Split text into segments safely under max_chars: first along paragraph
+    boundaries, then hard-slicing on whitespace for any single paragraph
+    that's still too large on its own (e.g. website text extracted as one
+    long run with no blank-line breaks at all)."""
+    paragraphs = text.split("\n\n")
+    segments: list[str] = []
+    current = ""
+    for paragraph in paragraphs:
+        for piece in _hard_slice(paragraph, max_chars):
+            candidate = f"{current}\n\n{piece}" if current else piece
+            if len(candidate) > max_chars and current:
+                segments.append(current)
+                current = piece
+            else:
+                current = candidate
+    if current:
+        segments.append(current)
+    return segments or [text]
+
+
+def _hard_slice(text: str, max_chars: int) -> list[str]:
+    """Split text into <= max_chars pieces on word boundaries where possible,
+    guaranteeing no single piece exceeds max_chars regardless of the source
+    text's paragraph structure."""
+    if len(text) <= max_chars:
+        return [text]
+    words = text.split(" ")
+    pieces: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}" if current else word
+        if len(candidate) > max_chars and current:
+            pieces.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        pieces.append(current)
+    return pieces
 
 
 @lru_cache(maxsize=1)

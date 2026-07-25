@@ -1,4 +1,7 @@
 const DEFAULT_BACKEND_URL = "http://localhost:8000/api/v1";
+const DEFAULT_TOP_K = 6;
+const DEFAULT_MAX_PAGES = 10;
+const DEFAULT_MAX_DEPTH = 1;
 const STORAGE_KEYS = {
   backendUrl: "sageBackendUrl",
   activeJob: "sageActiveIngestJob",
@@ -6,12 +9,20 @@ const STORAGE_KEYS = {
 const MAX_HISTORY_TURNS = 6;
 const STALL_TIMEOUT_MS = 30000;
 
+const TAB_TYPE_META = {
+  website: { title: "Crawl Website", urlLabel: "Website URL", placeholder: "https://www.python.org/about/", button: "Crawl website", sourcesTitle: "Website Sources", chip: "Website" },
+  video: { title: "Ingest YouTube Video", urlLabel: "YouTube URL", placeholder: "https://www.youtube.com/watch?v=...", button: "Ingest Transcript", sourcesTitle: "Video Sources", chip: "YouTube" },
+  github: { title: "Ingest GitHub Repository", urlLabel: "GitHub Repository URL", placeholder: "https://github.com/owner/repo", button: "Ingest Repository", sourcesTitle: "GitHub Sources", chip: "GitHub" },
+};
+
 const state = {
   backendUrl: DEFAULT_BACKEND_URL,
-  currentTab: null,
   sources: [],
   selectedSourceIds: [],
   messages: [], // { question, streaming, answer: { text, citations, confidence_score, confidence_label, confidence_reason, follow_up_question, warnings } }
+  tabType: "unsupported",
+  tabUrl: "",
+  videoFallbackUrl: null,
 };
 
 let activeStreamController = null;
@@ -32,22 +43,82 @@ function setQaStatus(message, kind = "info") {
   el.dataset.kind = kind;
 }
 
-function detectWebsiteSupport(tab) {
+function setIngestStatus(message, kind = "info") {
+  const el = $("ingest-status");
+  el.textContent = message;
+  el.dataset.kind = kind;
+}
+
+// --- Tab detection ---
+
+function detectTabType(tab) {
   const url = tab?.url || "";
   if (!/^https?:\/\//i.test(url)) return "unsupported";
-  if (/youtube\.com|youtu\.be/i.test(url)) return "main_app_video";
-  if (/github\.com/i.test(url)) return "main_app_github";
-  if (/\.pdf(?:[?#]|$)/i.test(url)) return "main_app_pdf";
+  if (/^https?:\/\/(www\.)?(youtube\.com\/watch|youtu\.be\/)/i.test(url)) return "video";
+  if (/^https?:\/\/(www\.)?github\.com\/[^\/]+\/[^\/]+/i.test(url)) return "github";
+  if (/\.pdf(?:[?#]|$)/i.test(url)) return "pdf";
   return "website";
 }
 
 function unsupportedMessage(type) {
   return {
-    main_app_video: "Video Intelligence is available in the main SAGE web app.",
-    main_app_github: "GitHub Intelligence is available in the main SAGE web app.",
-    main_app_pdf: "PDF upload is available in the main SAGE web app.",
-    unsupported: "This page type is not supported by the website-only extension.",
-  }[type] || "Unsupported page.";
+    pdf: "PDF sources aren't supported from the extension yet. Use the main SAGE app to upload a PDF.",
+    unsupported: "This page isn't a website, YouTube video, or GitHub repository the extension can analyze.",
+  }[type] || "This page type isn't supported yet.";
+}
+
+function applyTabType(type, url) {
+  const previousType = state.tabType;
+  state.tabType = type;
+  state.tabUrl = url || "";
+  state.videoFallbackUrl = null;
+  $("video-fallback").classList.add("hidden");
+
+  // A new tab type means a new conversational context (e.g. GitHub questions
+  // no longer make sense once you've switched to a YouTube video) -- start fresh
+  // rather than leaving the old thread visible and confusing.
+  if (previousType !== type && state.messages.length) {
+    startNewChat();
+  }
+
+  const chip = $("tab-detected");
+  const meta = TAB_TYPE_META[type];
+
+  if (!meta) {
+    chip.textContent = "";
+    $("ingest-form").classList.add("hidden");
+    $("unsupported-notice").classList.remove("hidden");
+    $("unsupported-notice").querySelector("p").textContent = unsupportedMessage(type);
+    $("sources-title").textContent = "All Sources";
+    renderSourceCards();
+    return;
+  }
+
+  chip.textContent = `Detected: ${meta.chip}`;
+  $("ingest-form").classList.remove("hidden");
+  $("unsupported-notice").classList.add("hidden");
+  $("ingest-title").textContent = meta.title;
+  $("source-url-label").textContent = meta.urlLabel;
+  $("source-url").placeholder = meta.placeholder;
+  $("ingest-button").textContent = meta.button;
+  $("sources-title").textContent = meta.sourcesTitle;
+  $("github-branch-field").classList.toggle("hidden", type !== "github");
+
+  if (url && $("source-url").value.trim() !== url) {
+    $("source-url").value = url;
+  }
+  renderSourceCards();
+}
+
+async function refreshTabDetection() {
+  let tab = null;
+  try {
+    [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  } catch {
+    tab = null;
+  }
+  const type = tab ? detectTabType(tab) : "unsupported";
+  applyTabType(type, tab?.url || "");
 }
 
 function apiRoot() {
@@ -72,9 +143,19 @@ async function requestJson(path, options = {}, timeoutMs = 15000) {
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {
     const detail = typeof payload === "string" ? payload : payload?.detail || payload?.message || payload?.error;
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail) || "Request failed");
+    const err = new Error(typeof detail === "string" ? detail : JSON.stringify(detail) || "Request failed");
+    err.errorCode = typeof payload === "object" ? payload?.detail?.error_code || payload?.error_code : undefined;
+    throw err;
   }
   return payload;
+}
+
+function openSettings() {
+  $("settings-panel").classList.remove("hidden");
+}
+
+function toggleSettings() {
+  $("settings-panel").classList.toggle("hidden");
 }
 
 async function checkBackend() {
@@ -90,6 +171,7 @@ async function checkBackend() {
       ? "Backend did not respond within 6s. Is it running?"
       : "SAGE backend is not running. Start it with: cd backend && python run.py";
     setStatus(message, "error");
+    openSettings();
     return false;
   } finally {
     clearTimeout(timer);
@@ -108,39 +190,18 @@ async function saveBackendUrl() {
   setStatus(`Saved backend URL: ${state.backendUrl}`, "success");
 }
 
-async function refreshCurrentTab() {
+async function useCurrentTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  state.currentTab = tab
-    ? { url: tab.url || "", title: tab.title || "", sourceType: detectWebsiteSupport(tab) }
-    : null;
-  renderCurrentTab();
-}
-
-function renderCurrentTab() {
-  const tab = state.currentTab;
-  const type = tab?.sourceType || "unsupported";
-  $("tab-type").textContent = type === "website" ? "Website" : "Main app / unsupported";
-  $("tab-type").className = `badge ${type}`;
-  $("tab-title").textContent = tab?.title || "No tab selected";
-  $("tab-url").textContent = tab?.url || "";
-  $("tab-summary").textContent = type === "website"
-    ? "Website page detected. You can crawl it from this side panel."
-    : unsupportedMessage(type);
-}
-
-function useCurrentTab() {
-  const tab = state.currentTab;
-  if (!tab) {
-    setStatus("No active tab available.", "error");
+  const type = tab ? detectTabType(tab) : "unsupported";
+  if (!tab || !TAB_TYPE_META[type]) {
+    setIngestStatus(unsupportedMessage(type), "error");
     return;
   }
-  if (tab.sourceType !== "website") {
-    setStatus(unsupportedMessage(tab.sourceType), "error");
-    return;
-  }
-  $("source-url").value = tab.url;
-  setStatus("Loaded current website URL.", "success");
+  applyTabType(type, tab.url);
+  setIngestStatus("Loaded the current tab's URL.", "success");
 }
+
+// --- Source list (all types; filtered to the detected tab type for display) ---
 
 function toggleSource(sourceId) {
   state.selectedSourceIds = state.selectedSourceIds.includes(sourceId)
@@ -162,18 +223,30 @@ function updateSelectedSourcesSummary() {
   $("ask-button").disabled = selected.length === 0;
 }
 
+function visibleSources() {
+  if (TAB_TYPE_META[state.tabType]) {
+    return state.sources.filter((s) => s.source_type === state.tabType);
+  }
+  return state.sources;
+}
+
 function renderSourceCards() {
   const container = $("sources-list");
   container.innerHTML = "";
-  if (!state.sources.length) {
+  const visible = visibleSources();
+  const visibleIds = new Set(visible.map((s) => s.source_id));
+  state.selectedSourceIds = state.selectedSourceIds.filter((id) => visibleIds.has(id));
+
+  if (!visible.length) {
     const empty = document.createElement("div");
     empty.className = "source-item";
-    empty.innerHTML = '<div class="source-item-body"><div class="source-title">No website sources yet</div><div class="source-meta">Crawl a website first.</div></div>';
+    const label = TAB_TYPE_META[state.tabType]?.chip || "matching";
+    empty.innerHTML = `<div class="source-item-body"><div class="source-title">No ${label} sources yet</div><div class="source-meta">Ingest one from the panel above.</div></div>`;
     container.append(empty);
     updateSelectedSourcesSummary();
     return;
   }
-  for (const source of state.sources) {
+  for (const source of visible) {
     const selected = state.selectedSourceIds.includes(source.source_id);
     const card = document.createElement("label");
     card.className = `source-item ${selected ? "selected" : ""}`;
@@ -187,13 +260,13 @@ function renderSourceCards() {
     body.className = "source-item-body";
     const title = document.createElement("div");
     title.className = "source-title";
-    title.textContent = source.title || source.original_ref || "Website source";
+    title.textContent = source.title || source.original_ref || "Source";
     const meta = document.createElement("div");
     meta.className = "source-meta";
     meta.textContent = [source.status, source.canonical_ref].filter(Boolean).join(" · ");
     const tags = document.createElement("div");
     tags.className = "source-tags";
-    for (const label of ["website", `${source.chunks_count ?? 0} chunks`, source.crawled_pages ? `${source.crawled_pages} pages` : null].filter(Boolean)) {
+    for (const label of [source.source_type, `${source.chunks_count ?? 0} chunks`, source.crawled_pages ? `${source.crawled_pages} pages` : null].filter(Boolean)) {
       const tag = document.createElement("span");
       tag.className = "tag";
       tag.textContent = label;
@@ -208,21 +281,18 @@ function renderSourceCards() {
 
 async function loadSources() {
   try {
-    setStatus("Loading website sources...", "info");
     const payload = await requestJson("/sources");
-    state.sources = Array.isArray(payload) ? payload.filter((s) => s.source_type === "website" && s.status === "ready") : [];
-    state.selectedSourceIds = state.selectedSourceIds.filter((id) => state.sources.some((s) => s.source_id === id));
+    state.sources = Array.isArray(payload) ? payload.filter((s) => s.status === "ready") : [];
     renderSourceCards();
-    setStatus(`Loaded ${state.sources.length} website source${state.sources.length === 1 ? "" : "s"}.`, "success");
   } catch (error) {
-    setStatus(error.message || "Failed to load sources.", "error");
+    setIngestStatus(error.message || "Failed to load sources.", "error");
   }
 }
 
 // --- Ingest job tracking (persisted so a re-opened panel can resume watching it) ---
 
-async function storeActiveJob(jobId, sourceUrl) {
-  await chrome.storage.local.set({ [STORAGE_KEYS.activeJob]: { jobId, sourceUrl, startedAt: new Date().toISOString() } });
+async function storeActiveJob(jobId, sourceUrl, kind) {
+  await chrome.storage.local.set({ [STORAGE_KEYS.activeJob]: { jobId, sourceUrl, kind, startedAt: new Date().toISOString() } });
 }
 
 async function clearActiveJob() {
@@ -261,11 +331,11 @@ async function resumeActiveJobIfAny() {
       await clearActiveJob();
       return;
     }
-    setStatus(`Resuming crawl for ${stored.sourceUrl}...`, "info");
+    setIngestStatus(`Resuming ingestion for ${stored.sourceUrl}...`, "info");
     $("ingest-button").disabled = true;
     const result = await pollJob(stored.jobId);
     await loadSources();
-    setStatus(result.status === "failed" ? "Website crawl failed." : "Website crawl complete.", result.status === "failed" ? "error" : "success");
+    setIngestStatus(result.status === "failed" ? "Ingestion failed." : "Ingestion complete.", result.status === "failed" ? "error" : "success");
   } catch {
     // Job likely expired from the backend's in-memory tracker while the panel was closed.
     await clearActiveJob();
@@ -274,32 +344,98 @@ async function resumeActiveJobIfAny() {
   }
 }
 
-async function ingestCurrentWebsite() {
+function selectCreatedSource(createdId) {
+  if (createdId && !state.selectedSourceIds.includes(createdId)) {
+    state.selectedSourceIds = [createdId];
+    renderSourceCards();
+  }
+}
+
+// --- Per-type ingestion ---
+
+async function ingestWebsite(sourceUrl) {
+  setIngestStatus("Starting website crawl...", "info");
+  showIngestProgress({ progress_percentage: 1, message: "Starting crawl" });
+  let result = await requestJson(
+    "/jobs/website-ingest",
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: sourceUrl, max_pages: DEFAULT_MAX_PAGES, max_depth: DEFAULT_MAX_DEPTH }) },
+    20000
+  );
+  await storeActiveJob(result.job_id, sourceUrl, "website");
+  result = await pollJob(result.job_id);
+  await loadSources();
+  selectCreatedSource(result.result?.sources_created?.[0]?.source_id);
+  setIngestStatus(result.status === "failed" ? "Website crawl failed." : "Website crawl complete.", result.status === "failed" ? "error" : "success");
+}
+
+async function ingestVideo(sourceUrl, { autoTranscribe = false } = {}) {
+  const path = autoTranscribe ? "/jobs/video-auto-transcribe" : "/jobs/video-ingest";
+  setIngestStatus(autoTranscribe ? "Generating transcript automatically (this can take a few minutes)..." : "Fetching video transcript...", "info");
+  showIngestProgress({ progress_percentage: 1, message: "Starting" });
+  let result = await requestJson(
+    path,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: sourceUrl }) },
+    20000
+  );
+  await storeActiveJob(result.job_id, sourceUrl, "video");
+  result = await pollJob(result.job_id);
+  if (result.status === "failed") {
+    if (!autoTranscribe && result.result?.error_code === "TRANSCRIPT_NOT_AVAILABLE") {
+      state.videoFallbackUrl = sourceUrl;
+      $("video-fallback").classList.remove("hidden");
+      setIngestStatus(result.result?.message || "Captions aren't available for this video.", "error");
+      return;
+    }
+    setIngestStatus(result.result?.message || result.error || "Video ingestion failed.", "error");
+    return;
+  }
+  await loadSources();
+  selectCreatedSource(result.result?.source_id);
+  $("video-fallback").classList.add("hidden");
+  setIngestStatus(`Video ready: ${result.result?.chunks_count ?? "?"} chunks.`, "success");
+}
+
+async function ingestGithub(sourceUrl, branch) {
+  setIngestStatus("Cloning and indexing repository...", "info");
+  showIngestProgress({ progress_percentage: 1, message: "Starting" });
+  let result = await requestJson(
+    "/jobs/github-ingest",
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: sourceUrl, branch: branch || null }) },
+    20000
+  );
+  await storeActiveJob(result.job_id, sourceUrl, "github");
+  result = await pollJob(result.job_id);
+  await loadSources();
+  selectCreatedSource(result.result?.source_id);
+  setIngestStatus(result.status === "failed" ? (result.result?.message || result.error || "GitHub ingestion failed.") : "Repository ready.", result.status === "failed" ? "error" : "success");
+}
+
+async function handleIngestSubmit() {
   const sourceUrl = $("source-url").value.trim();
-  const maxPages = Number($("max-pages").value || 10);
-  const maxDepth = Number($("max-depth").value || 1);
-  if (!sourceUrl) throw new Error("Enter a website URL first.");
-  if (!/^https?:\/\//i.test(sourceUrl)) throw new Error("Only http/https website URLs are supported.");
+  if (!sourceUrl) throw new Error("Enter a URL first.");
+  if (!/^https?:\/\//i.test(sourceUrl)) throw new Error("Only http/https URLs are supported.");
 
   $("ingest-button").disabled = true;
   try {
     if (!(await checkBackend())) return;
-    setStatus("Starting website crawl...", "info");
-    showIngestProgress({ progress_percentage: 1, message: "Starting crawl" });
-    let result = await requestJson(
-      "/jobs/website-ingest",
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: sourceUrl, max_pages: maxPages, max_depth: maxDepth }) },
-      20000
-    );
-    await storeActiveJob(result.job_id, sourceUrl);
-    result = await pollJob(result.job_id);
-    await loadSources();
-    const createdId = result.result?.sources_created?.[0]?.source_id;
-    if (createdId && !state.selectedSourceIds.includes(createdId)) {
-      state.selectedSourceIds = [createdId];
-      renderSourceCards();
+    if (state.tabType === "video") {
+      await ingestVideo(sourceUrl);
+    } else if (state.tabType === "github") {
+      await ingestGithub(sourceUrl, $("github-branch").value.trim());
+    } else {
+      await ingestWebsite(sourceUrl);
     }
-    setStatus(result.status === "failed" ? "Website crawl failed." : "Website crawl complete.", result.status === "failed" ? "error" : "success");
+  } finally {
+    $("ingest-button").disabled = false;
+  }
+}
+
+async function handleVideoAutoTranscribe() {
+  if (!state.videoFallbackUrl) return;
+  $("ingest-button").disabled = true;
+  try {
+    if (!(await checkBackend())) return;
+    await ingestVideo(state.videoFallbackUrl, { autoTranscribe: true });
   } finally {
     $("ingest-button").disabled = false;
   }
@@ -369,12 +505,14 @@ function renderChatThread() {
   container.classList.remove("hidden");
   newChatBtn.classList.remove("hidden");
   container.innerHTML = "";
+  let lastQuestionBubble = null;
 
   state.messages.forEach((msg, idx) => {
     const qBubble = document.createElement("div");
     qBubble.className = "chat-turn-question";
     qBubble.textContent = msg.question;
     container.append(qBubble);
+    if (idx === state.messages.length - 1) lastQuestionBubble = qBubble;
 
     const answerBox = document.createElement("div");
     answerBox.className = "chat-turn-answer";
@@ -443,7 +581,12 @@ function renderChatThread() {
     container.append(answerBox);
   });
 
-  container.scrollTop = container.scrollHeight;
+  // Anchor the scroll at the top of the newest question rather than snapping to
+  // the very bottom -- for a long answer, scrolling to scrollHeight shows its
+  // tail end first, forcing the user to scroll back up just to read from the top.
+  if (lastQuestionBubble) {
+    container.scrollTop = lastQuestionBubble.offsetTop;
+  }
 }
 
 function startNewChat() {
@@ -456,8 +599,8 @@ function startNewChat() {
 async function askQuestion(overrideQuestion) {
   const question = (overrideQuestion ?? $("question").value).trim();
   const mode = $("qa-mode").value;
-  const topK = Number($("top-k").value || 6);
-  if (!state.selectedSourceIds.length) throw new Error("Select at least one website source first.");
+  const topK = DEFAULT_TOP_K;
+  if (!state.selectedSourceIds.length) throw new Error("Select at least one source first.");
   if (!question) throw new Error("Enter a question first.");
 
   const history = state.messages.slice(-MAX_HISTORY_TURNS).map((m) => ({ question: m.question, answer: m.answer.text }));
@@ -522,19 +665,18 @@ async function askQuestion(overrideQuestion) {
   }
 }
 
-async function bootstrap() {
-  await loadBackendUrl();
-  await refreshCurrentTab();
-  await checkBackend();
-  await loadSources();
-  await resumeActiveJobIfAny();
-
+function wireEventListeners() {
+  $("settings-toggle").addEventListener("click", toggleSettings);
   $("save-backend").addEventListener("click", saveBackendUrl);
   $("check-backend").addEventListener("click", checkBackend);
-  $("refresh-tab").addEventListener("click", refreshCurrentTab);
-  $("use-current-tab").addEventListener("click", useCurrentTab);
+  $("use-current-tab").addEventListener("click", () => {
+    useCurrentTab().catch((error) => setIngestStatus(error.message, "error"));
+  });
   $("ingest-button").addEventListener("click", async () => {
-    try { await ingestCurrentWebsite(); } catch (error) { setStatus(error.message, "error"); }
+    try { await handleIngestSubmit(); } catch (error) { setIngestStatus(error.message, "error"); }
+  });
+  $("video-auto-button").addEventListener("click", async () => {
+    try { await handleVideoAutoTranscribe(); } catch (error) { setIngestStatus(error.message, "error"); }
   });
   $("refresh-sources").addEventListener("click", loadSources);
   $("new-chat").addEventListener("click", startNewChat);
@@ -547,6 +689,27 @@ async function bootstrap() {
       $("ask-button").click();
     }
   });
+
+  // Live re-detection so switching tabs while the panel stays open re-syncs it,
+  // without requiring the user to click anything. Registered before any of
+  // bootstrap()'s network calls so a tab switch during startup is never missed.
+  if (chrome.tabs?.onActivated) {
+    chrome.tabs.onActivated.addListener(() => refreshTabDetection());
+  }
+  if (chrome.tabs?.onUpdated) {
+    chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+      if (changeInfo.status === "complete" && tab.active) refreshTabDetection();
+    });
+  }
+}
+
+async function bootstrap() {
+  wireEventListeners();
+  await loadBackendUrl();
+  await refreshTabDetection();
+  await checkBackend();
+  await loadSources();
+  await resumeActiveJobIfAny();
 }
 
 document.addEventListener("DOMContentLoaded", bootstrap);
