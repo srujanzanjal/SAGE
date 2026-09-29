@@ -210,8 +210,9 @@ def _resolve_recrawl_target(request: RecrawlRequest) -> tuple[str, str]:
 
 
 def recrawl_website(request: RecrawlRequest) -> WebsiteCrawlResponse:
-    kb_id, canonical_ref = _resolve_recrawl_target(request)
-    delete_knowledgebase(kb_id)
-    return crawl_website_ingest(canonical_ref, max_pages=request.max_pages, max_depth=request.max_depth)
+    _kb_id, canonical_ref = _resolve_recrawl_target(request)
+    return crawl_website_ingest(
+        canonical_ref, max_pages=request.max_pages, max_depth=request.max_depth, replace_existing=True
+    )
 
 

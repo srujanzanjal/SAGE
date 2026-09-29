@@ -1,5 +1,67 @@
-import { BadgeCheck, Quote, AlertCircle, FileText, Globe2, Copy, Video, GitBranch, Code2 } from "lucide-react";
-import { useState } from "react";
+import { BadgeCheck, Quote, AlertCircle, FileText, Globe2, Copy, Video, GitBranch, Code2, ChevronDown } from "lucide-react";
+import { Fragment, useId, useState } from "react";
+
+const INLINE_PATTERN = /(\*\*[^*]+\*\*|`[^`]+`|\[S\d+\]|【S\d+】)/g;
+const LIST_ITEM = /^\s*(?:[-*•]|\d+[.)])\s+/;
+
+// Minimal markdown for LLM answers: paragraphs, bullet/numbered lists,
+// headings, **bold**, `code`, and [S1] citation markers as clickable chips.
+function renderInline(text, onCite) {
+  return text.split(INLINE_PATTERN).map((part, i) => {
+    if (!part) return null;
+    const cite = part.match(/^(?:\[|【)(S\d+)(?:\]|】)$/);
+    if (cite) {
+      return (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onCite(cite[1])}
+          className="mx-0.5 inline-flex -translate-y-px items-center rounded-md bg-indigo-100 px-1.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-200"
+          title={`Jump to source ${cite[1]}`}
+        >
+          {cite[1]}
+        </button>
+      );
+    }
+    if (part.startsWith("**")) return <strong key={i} className="font-semibold text-slate-950">{part.slice(2, -2)}</strong>;
+    if (part.startsWith("`")) return <code key={i} className="rounded bg-slate-100 px-1 py-0.5 text-[0.9em]">{part.slice(1, -1)}</code>;
+    return <Fragment key={i}>{part}</Fragment>;
+  });
+}
+
+function AnswerText({ text, onCite }) {
+  const blocks = [];
+  for (const line of text.split("\n")) {
+    const last = blocks[blocks.length - 1];
+    if (!line.trim()) {
+      blocks.push({ type: "gap" });
+    } else if (LIST_ITEM.test(line)) {
+      const ordered = /^\s*\d/.test(line);
+      const item = line.replace(LIST_ITEM, "");
+      if (last?.type === "list" && last.ordered === ordered) last.items.push(item);
+      else blocks.push({ type: "list", ordered, items: [item] });
+    } else if (/^#{1,6}\s/.test(line)) {
+      blocks.push({ type: "heading", text: line.replace(/^#+\s*/, "") });
+    } else if (last?.type === "p") {
+      last.lines.push(line);
+    } else {
+      blocks.push({ type: "p", lines: [line] });
+    }
+  }
+  return blocks.map((block, i) => {
+    if (block.type === "gap") return null;
+    if (block.type === "heading") return <p key={i} className="mt-3 font-bold text-slate-950">{renderInline(block.text, onCite)}</p>;
+    if (block.type === "list") {
+      const List = block.ordered ? "ol" : "ul";
+      return (
+        <List key={i} className={`my-2 space-y-1 pl-5 ${block.ordered ? "list-decimal" : "list-disc"}`}>
+          {block.items.map((item, j) => <li key={j}>{renderInline(item, onCite)}</li>)}
+        </List>
+      );
+    }
+    return <p key={i} className="my-2 first:mt-0">{block.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{renderInline(l, onCite)}</Fragment>)}</p>;
+  });
+}
 
 function getConfidenceBadgeColor(score) {
   if (score == null) return "bg-slate-50 text-slate-500 border-slate-200";
@@ -17,13 +79,30 @@ function getConfidenceLabel(score) {
 
 export default function AnswerCard({ answer, streaming = false, onAskFollowUp = null }) {
   const [copyMessage, setCopyMessage] = useState(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const uid = useId();
 
   if (!answer) return null;
+
+  // A "not in the source" reply cites nothing, so its retrieved chunks would only confuse.
+  const notAvailable = /^not available in the provided source/i.test((answer.answer || "").trim());
+  const citations = notAvailable ? [] : answer.citations || [];
+
+  function jumpToCitation(citationId) {
+    setSourcesOpen(true);
+    // Wait for the list to render before scrolling to it.
+    setTimeout(() => {
+      const el = document.getElementById(`${uid}-${citationId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-indigo-400");
+      setTimeout(() => el.classList.remove("ring-2", "ring-indigo-400"), 1600);
+    }, 50);
+  }
 
   const hasConfidenceScore = typeof answer.confidence_score === "number";
   const confidenceLabel = getConfidenceLabel(answer.confidence_score);
   const confidencePercent = hasConfidenceScore ? Math.round(answer.confidence_score * 100) : null;
-  const showLowConfidenceWarning = hasConfidenceScore && answer.confidence_score < 0.4;
 
   async function copyAnswer() {
     try {
@@ -56,15 +135,10 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 font-medium">
             {answer.mode === "grounded" ? "🔒 Grounded" : "🔓 Exploratory"}
           </span>
-          {answer.question && (
-            <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700">
-              Q: {answer.question.substring(0, 40)}{answer.question.length > 40 ? "..." : ""}
-            </span>
-          )}
         </div>
 
-        <div className="whitespace-pre-wrap leading-7 text-slate-800 mb-4">
-          {answer.answer}
+        <div className="mb-4 leading-7 text-slate-800">
+          <AnswerText text={answer.answer || ""} onCite={jumpToCitation} />
           {streaming && <span className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-indigo-500" aria-hidden="true" />}
         </div>
 
@@ -97,36 +171,37 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
           {copyMessage && <span className="text-slate-500">{copyMessage}</span>}
         </div>
 
-        {showLowConfidenceWarning && (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-3 text-sm text-amber-800">
-            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-            <span>No strong evidence found. The retrieved source evidence may be weak.</span>
-          </div>
-        )}
-
-        {answer.warnings?.length > 0 && (
-          <div className="mt-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
-            <p className="font-medium mb-1">Warnings:</p>
-            {answer.warnings.map((w, idx) => (
-              <p key={idx}>• {w}</p>
-            ))}
+        {!streaming && !notAvailable && answer.warnings?.length > 0 && (
+          <div className="mt-3 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+            <div>
+              {answer.warnings.map((w, idx) => (
+                <p key={idx}>{w}</p>
+              ))}
+            </div>
           </div>
         )}
       </article>
 
-      {answer.citations && answer.citations.length > 0 && (
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
+      {citations.length > 0 && (
+        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <button
+            type="button"
+            onClick={() => setSourcesOpen((open) => !open)}
+            className="flex w-full items-center gap-2 text-left"
+            aria-expanded={sourcesOpen}
+          >
             <Quote size={18} className="text-indigo-600" />
             <h3 className="text-lg font-bold text-slate-950">Citations and Sources</h3>
             <span className="ml-auto text-xs font-semibold text-slate-500">
-              {answer.citations.length} source{answer.citations.length !== 1 ? "s" : ""}
+              {citations.length} source{citations.length !== 1 ? "s" : ""}
             </span>
-          </div>
+            <ChevronDown size={18} className={`text-slate-500 transition ${sourcesOpen ? "rotate-180" : ""}`} />
+          </button>
 
-          <div className="grid gap-3">
-            {answer.citations.map((citation, idx) => (
-              <div key={citation.citation_id ?? idx} className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4 hover:border-slate-300 transition">
+          {sourcesOpen && <div className="mt-4 grid gap-3">
+            {citations.map((citation, idx) => (
+              <div id={`${uid}-${citation.citation_id}`} key={citation.citation_id ?? idx} className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4 hover:border-slate-300 transition">
                 {/* Citation Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -226,11 +301,11 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
                 </details>
               </div>
             ))}
-          </div>
+          </div>}
         </section>
       )}
 
-      {!(answer.citations && answer.citations.length > 0) && (
+      {citations.length === 0 && !notAvailable && !streaming && (
         answer.retrieved_sources && answer.retrieved_sources.length > 0 ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
@@ -242,7 +317,7 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
               {answer.retrieved_sources.map((r, idx) => (
                 <div key={idx} className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4">
                   <div className="flex items-center gap-2 text-sm mb-2">
-                    <Video size={14} className="text-emerald-600" />
+                    {r.source_type === "video" ? <Video size={14} className="text-emerald-600" /> : r.source_type === "pdf" ? <FileText size={14} className="text-purple-600" /> : r.source_type === "github" ? <GitBranch size={14} className="text-slate-700" /> : <Globe2 size={14} className="text-blue-600" />}
                     <span className="font-medium text-slate-800">{r.source_title || r.source_ref}</span>
                   </div>
                   {r.timestamp_label && (

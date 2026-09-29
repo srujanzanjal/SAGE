@@ -207,6 +207,9 @@ def scan_repository_files(
             if fname in _LOCK_FILES:
                 continue
             full = os.path.join(dirpath, fname)
+            if os.path.islink(full):
+                # A repo symlink could point at local files (e.g. ~/.ssh, backend/.env).
+                continue
             rel = os.path.relpath(full, root).replace("\\", "/")
             try:
                 if os.path.getsize(full) > max_file_size:

@@ -1,4 +1,4 @@
-import { ArrowLeft, BrainCircuit } from "lucide-react";
+import { ArrowLeft, BrainCircuit, ChevronUp, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ChatPanel from "./components/ChatPanel";
 import LandingPage from "./components/LandingPage";
@@ -26,6 +26,8 @@ const MODULES = {
   },
 };
 
+const ADD_LABEL = { website: "website", pdf: "PDF", video: "video", github: "repository" };
+
 export default function App() {
   const [sources, setSources] = useState([]);
   const [selectedSource, setSelectedSource] = useState(null);
@@ -45,6 +47,8 @@ export default function App() {
   );
 
   const currentModule = selectedType ? MODULES[selectedType] : null;
+  const [ingestOpen, setIngestOpen] = useState(false);
+  const showIngest = ingestOpen || filteredSources.length === 0;
 
   async function refreshSources() {
     try {
@@ -149,6 +153,7 @@ export default function App() {
     });
 
     if (createdSources.length > 0) {
+      setIngestOpen(false);
       setSelectedSource(createdSources[0]);
       setSelectedType(createdSources[0].source_type);
     }
@@ -262,20 +267,6 @@ export default function App() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {[
-              "Website crawl",
-              "PDF upload",
-              "Video transcript",
-              "GitHub repo",
-              "Confidence scoring",
-              "Source citations",
-            ].map((item) => (
-              <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">
-                {item}
-              </div>
-            ))}
-          </div>
         </header>
 
         {loadError && (
@@ -322,14 +313,29 @@ export default function App() {
                 )}
               </div>
 
-              <SourceIngestPanel
-                sourceType={selectedType}
-                onIngested={handleIngested}
-                onGoBack={() => {
-                  setSelectedType(null);
-                  setSelectedSource(null);
-                }}
-              />
+              {filteredSources.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIngestOpen((open) => !open)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-700"
+                  aria-expanded={showIngest}
+                >
+                  {showIngest ? <ChevronUp size={16} /> : <Plus size={16} />}
+                  {showIngest ? "Hide" : `Add another ${ADD_LABEL[selectedType]}`}
+                </button>
+              )}
+
+              {/* Hidden rather than unmounted, so a running ingest keeps polling. */}
+              <div className={showIngest ? (filteredSources.length > 0 ? "mt-4" : "") : "hidden"}>
+                <SourceIngestPanel
+                  sourceType={selectedType}
+                  onIngested={handleIngested}
+                  onGoBack={() => {
+                    setSelectedType(null);
+                    setSelectedSource(null);
+                  }}
+                />
+              </div>
             </div>
 
             <SummaryCard source={selectedSource} />

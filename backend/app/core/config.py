@@ -17,9 +17,15 @@ class Settings(BaseSettings):
     supabase_url: Optional[str] = Field(default=None, alias="SUPABASE_URL")
     supabase_key: Optional[str] = Field(default=None, alias="SUPABASE_KEY")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
+    gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
 
     # Configurable model names.
-    groq_model: str = Field(default="llama-3.1-8b-instant", alias="GROQ_MODEL")
+    groq_model: str = Field(default="qwen/qwen3.8-27b", alias="GROQ_MODEL")
+    # Extra free Groq models tried in order when the ones before are rate-limited.
+    groq_fallback_models: str = Field(default="openai/gpt-oss-20b,openai/gpt-oss-120b", alias="GROQ_FALLBACK_MODELS")
+    # Gemini is the primary LLM; the fast model handles query rewriting and translation.
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    gemini_fast_model: str = Field(default="gemini-2.5-flash-lite", alias="GEMINI_FAST_MODEL")
     embedding_model_name: str = Field(default="all-MiniLM-L6-v2", alias="EMBEDDING_MODEL_NAME")
 
     # Local Chroma persistence.
@@ -69,6 +75,10 @@ class Settings(BaseSettings):
         return self.cors_origin_regex
 
     @property
+    def groq_fallback_model_list(self) -> list[str]:
+        return [m.strip() for m in self.groq_fallback_models.split(",") if m.strip()]
+
+    @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
 
@@ -86,9 +96,9 @@ class Settings(BaseSettings):
         if missing:
             raise RuntimeError(f"Missing required Supabase environment variables: {', '.join(missing)}")
 
-    def require_groq(self) -> None:
-        if not self.groq_api_key:
-            raise RuntimeError("Missing required GROQ_API_KEY environment variable")
+    def require_llm(self) -> None:
+        if not self.gemini_api_key and not self.groq_api_key:
+            raise RuntimeError("Set GEMINI_API_KEY and/or GROQ_API_KEY in backend/.env")
 
 
 @lru_cache

@@ -485,6 +485,31 @@ async function streamAnswer(payload, handlers, signal) {
   }
 }
 
+// Minimal markdown for LLM answers (**bold**, `code`, "* " bullets, "# " headings),
+// built as DOM nodes rather than innerHTML so page-derived text can't inject markup.
+function appendFormattedText(container, text) {
+  const lines = text.split("\n");
+  lines.forEach((rawLine, index) => {
+    let line = rawLine.replace(/^(\s*)[-*•]\s+/, "$1• ").replace(/^#{1,6}\s+/, "");
+    const isHeading = /^#{1,6}\s+/.test(rawLine);
+    for (const part of line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)) {
+      if (!part) continue;
+      if (part.startsWith("**") || isHeading) {
+        const strong = document.createElement("strong");
+        strong.textContent = part.startsWith("**") ? part.slice(2, -2) : part;
+        container.append(strong);
+      } else if (part.startsWith("`")) {
+        const code = document.createElement("code");
+        code.textContent = part.slice(1, -1);
+        container.append(code);
+      } else {
+        container.append(document.createTextNode(part));
+      }
+    }
+    if (index < lines.length - 1) container.append(document.createTextNode("\n"));
+  });
+}
+
 function confidenceClass(label) {
   const l = (label || "").toLowerCase();
   if (l === "high") return "high";
@@ -538,7 +563,7 @@ function renderChatThread() {
 
     const textEl = document.createElement("div");
     textEl.className = "chat-turn-answer-text";
-    textEl.textContent = msg.answer.text;
+    appendFormattedText(textEl, msg.answer.text || "");
     if (msg.streaming) {
       const cursor = document.createElement("span");
       cursor.className = "stream-cursor";

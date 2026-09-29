@@ -12,6 +12,12 @@ from app.api.v1.endpoints import sources as sources_endpoint
 
 
 class FakeVectorStore:
+    def get_overview_chunks(self, source_ids):
+        return []
+
+    def get_edge_chunks(self, source_id, from_end, count=2):
+        return []
+
     def __init__(self, chunks: list[RetrievedChunk] | None = None):
         self.chunks = chunks or []
         self.last_upsert = None
@@ -199,7 +205,7 @@ def test_video_chunking_preserves_timestamps():
 
 def test_unavailable_transcript_error_handling(monkeypatch):
     class FakeApi:
-        def list_transcripts(self, video_id):
+        def list(self, video_id):
             raise RuntimeError("disabled")
 
     monkeypatch.setattr(video_transcript, "YouTubeTranscriptApi", lambda: FakeApi())
@@ -286,7 +292,7 @@ def test_qa_over_video_transcript_includes_timestamp_label(monkeypatch):
             return [0.1]
 
     class FakeLLM:
-        def rewrite_query(self, question: str, history=None):
+        def rewrite_query(self, question: str, history=None, **kwargs):
             return question
 
         def generate_answer(self, question: str, context: str, mode: str, history=None):
@@ -295,7 +301,6 @@ def test_qa_over_video_transcript_includes_timestamp_label(monkeypatch):
     monkeypatch.setattr(qa_pipeline, "get_supabase_repository", lambda: fake_repo)
     monkeypatch.setattr(qa_pipeline, "get_embedding_service", lambda: FakeEmbeddingService())
     monkeypatch.setattr(qa_pipeline, "get_llm_service", lambda: FakeLLM())
-    monkeypatch.setattr(qa_pipeline, "should_rewrite", lambda question: False)
     monkeypatch.setattr(qa_pipeline, "rerank_chunks", lambda rewritten_query, chunks: chunks)
     monkeypatch.setattr(qa_pipeline, "get_vector_store", lambda: FakeVectorStore([fake_chunk]))
 
@@ -340,7 +345,7 @@ def test_qa_low_confidence_returns_follow_up_question(monkeypatch):
             return [0.1]
 
     class FakeLLM:
-        def rewrite_query(self, question: str, history=None):
+        def rewrite_query(self, question: str, history=None, **kwargs):
             return question
 
         def generate_answer(self, question: str, context: str, mode: str, history=None):
@@ -349,7 +354,6 @@ def test_qa_low_confidence_returns_follow_up_question(monkeypatch):
     monkeypatch.setattr(qa_pipeline, "get_supabase_repository", lambda: fake_repo)
     monkeypatch.setattr(qa_pipeline, "get_embedding_service", lambda: FakeEmbeddingService())
     monkeypatch.setattr(qa_pipeline, "get_llm_service", lambda: FakeLLM())
-    monkeypatch.setattr(qa_pipeline, "should_rewrite", lambda question: False)
     monkeypatch.setattr(qa_pipeline, "rerank_chunks", lambda rewritten_query, chunks: chunks)
     monkeypatch.setattr(qa_pipeline, "get_vector_store", lambda: FakeVectorStore([fake_chunk]))
 

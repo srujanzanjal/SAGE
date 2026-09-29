@@ -2,7 +2,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.models.schemas import IngestResponse, JobStatusResponse, VideoAutoTranscribeRequest, VideoIngestRequest, WebsiteIngestRequest, WebsiteCrawlResponse
 from app.services.ingestion_jobs import start_video_auto_transcribe_job, start_video_ingest_job
-from app.services.ingestion_pipeline import ingest_pdf, ingest_website, crawl_website_ingest
+from app.services.ingestion_pipeline import ingest_pdf, crawl_website_ingest
 from app.services.video_transcript import extract_video_id
 from app.utils.exceptions import (
     SourceExtractionError,

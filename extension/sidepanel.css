@@ -518,3 +518,11 @@ textarea {
     flex-direction: column;
   }
 }
+
+.chat-turn-answer-text code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 0 3px;
+}

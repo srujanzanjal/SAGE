@@ -1,5 +1,5 @@
 import pytest
-from app.services.github_repo import parse_github_url, chunk_file_by_lines, generate_repository_overview, RepoRef
+from app.services.github_repo import parse_github_url, chunk_file_by_lines, generate_repository_overview, scan_repository_files, RepoRef
 from app.utils.exceptions import SourceExtractionError
 import tempfile
 import os
@@ -284,3 +284,15 @@ def test_generate_repository_overview_branch_included():
         
         assert "develop" in overview
         assert "Branch:" in overview
+
+
+def test_scan_skips_symlinks_to_local_files(tmp_path):
+    secret = tmp_path / "secret.txt"
+    secret.write_text("TOP SECRET")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "main.py").write_text("print('hi')\n")
+    (repo / "notes.md").symlink_to(secret)
+
+    files = [rel for rel, _ in scan_repository_files(str(repo))]
+    assert files == ["main.py"]

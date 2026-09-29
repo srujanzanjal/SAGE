@@ -20,7 +20,6 @@ from app.services.github_repo import (
     detect_language_by_ext,
 )
 from app.services.vector_store import get_vector_store
-from app.services.web_scraper import extract_website_text
 from app.services.website_crawler import crawl_website
 from app.services.text_utils import estimate_tokens
 from app.services.translation import translate_if_needed
@@ -43,6 +42,15 @@ ProgressCallback = Callable[[str, int, str], None]
 def _report(progress_callback: Optional[ProgressCallback], step: str, percentage: int, message: str) -> None:
     if progress_callback:
         progress_callback(step, percentage, message)
+
+
+def _drop_incomplete_kb(repo: SupabaseRepository, kb: Optional[dict]) -> None:
+    """Remove a knowledgebase left behind by a failed or replaced run so the
+    next attempt can recreate it (canonical_ref is unique in Supabase)."""
+    if not kb:
+        return
+    get_vector_store().delete_by_knowledgebase(kb["id"])
+    repo.delete_knowledgebase(kb["id"])  # FK cascade removes its sources and chunks
 
 
 def _reindex_chunks(chunks):
@@ -152,94 +160,6 @@ def _persist_video_chunks(
     return len(text_chunks)
 
 
-def ingest_website(url: str, progress_callback: Optional[ProgressCallback] = None) -> IngestResponse:
-    settings = get_settings()
-    repo = SupabaseRepository()
-    canonical_ref = normalize_url(url)
-
-    existing_kb = repo.get_knowledgebase_by_canonical_ref(canonical_ref)
-    if existing_kb:
-        existing_chunks = repo.get_chunks_count(existing_kb["id"])
-        existing_source = repo.get_source_by_canonical_ref(canonical_ref)
-        if existing_chunks > 0 and existing_source:
-            return IngestResponse(
-                knowledgebase_id=existing_kb["id"],
-                source_id=existing_source["id"],
-                source_type="website",
-                canonical_ref=canonical_ref,
-                title=existing_source.get("title"),
-                status="ready",
-                chunks_count=existing_chunks,
-                reused_existing=True,
-                page_count=1,
-                crawled_pages=1,
-                warnings=["Duplicate URL detected. Reused existing knowledgebase."],
-            )
-
-    extraction = extract_website_text(canonical_ref)
-    title = extraction.title or safe_title_from_ref(canonical_ref)
-
-    kb = existing_kb or repo.create_knowledgebase(name=title, source_type="website", canonical_ref=canonical_ref)
-    kb_id = kb["id"]
-
-    try:
-        _report(progress_callback, "extracting", 20, "Extracting website content")
-        source = repo.create_source(
-            knowledgebase_id=kb_id,
-            source_type="website",
-            original_ref=url,
-            canonical_ref=canonical_ref,
-            title=title,
-            content_hash=sha256_text(extraction.text),
-            text_length=len(extraction.text),
-            meta={"final_url": extraction.final_url},
-        )
-        source_id = source["id"]
-
-        chunks = chunk_text(extraction.text, settings.chunk_size_chars, settings.chunk_overlap_chars)
-        if not chunks:
-            raise ValueError("No chunks generated from website text.")
-
-        chunk_ids = [make_chunk_id(kb_id, source_id, chunk.index, chunk.text) for chunk in chunks]
-        _report(progress_callback, "embedding", 70, "Generating embeddings")
-        embeddings = get_embedding_service().embed_documents([chunk.text for chunk in chunks])
-
-        get_vector_store().upsert_chunks(
-            knowledgebase_id=kb_id,
-            source_id=source_id,
-            source_type="website",
-            source_ref=canonical_ref,
-            chunks=chunks,
-            embeddings=embeddings,
-            chunk_ids=chunk_ids,
-        )
-        repo.insert_chunks(
-            knowledgebase_id=kb_id,
-            source_id=source_id,
-            source_type="website",
-            source_ref=canonical_ref,
-            chunks=chunks,
-            chunk_ids=chunk_ids,
-        )
-        repo.update_knowledgebase_status(kb_id, "ready")
-        _report(progress_callback, "ready", 100, "Website ingestion complete")
-        return IngestResponse(
-            knowledgebase_id=kb_id,
-            source_id=source_id,
-            source_type="website",
-            canonical_ref=canonical_ref,
-            title=title,
-            status="ready",
-            chunks_count=len(chunks),
-            page_count=1,
-            crawled_pages=1,
-            warnings=extraction.warnings,
-        )
-    except Exception:
-        repo.update_knowledgebase_status(kb_id, "failed")
-        raise
-
-
 def ingest_video(url: str, progress_callback: Optional[ProgressCallback] = None) -> IngestResponse:
     repo = SupabaseRepository()
     _report(progress_callback, "resolving video", 5, "Resolving video source")
@@ -277,7 +197,8 @@ def ingest_video(url: str, progress_callback: Optional[ProgressCallback] = None)
 
     title = transcript.title or "YouTube Video"
 
-    kb = existing_kb or repo.create_knowledgebase(name=title, source_type="video", canonical_ref=canonical_ref)
+    _drop_incomplete_kb(repo, existing_kb)
+    kb = repo.create_knowledgebase(name=title, source_type="video", canonical_ref=canonical_ref)
     kb_id = kb["id"]
 
     try:
@@ -398,7 +319,8 @@ def ingest_video_auto_transcribe(url: str, progress_callback: Optional[ProgressC
         for chunk in text_chunks
     ]
 
-    kb = existing_kb or repo.create_knowledgebase(name=transcript.title, source_type="video", canonical_ref=canonical_ref)
+    _drop_incomplete_kb(repo, existing_kb)
+    kb = repo.create_knowledgebase(name=transcript.title, source_type="video", canonical_ref=canonical_ref)
     kb_id = kb["id"]
 
     try:
@@ -465,15 +387,59 @@ def crawl_website_ingest(
     max_pages: int = 10,
     max_depth: int = 1,
     progress_callback: Optional[ProgressCallback] = None,
+    replace_existing: bool = False,
 ) -> WebsiteCrawlResponse:
-    """Crawl a website and ingest all pages under a single knowledgebase."""
+    """Crawl a website and ingest all pages under a single knowledgebase.
+
+    replace_existing=True (re-crawl) swaps out the stored crawl, but only after
+    the new crawl has succeeded, so a failed re-crawl keeps the old data.
+    """
     settings = get_settings()
     repo = SupabaseRepository()
-    
-    # Get crawled pages
+
+    # Check for an existing crawl before paying for Playwright + translation.
+    canonical_ref = normalize_url(url)
+    existing_kb = repo.get_knowledgebase_by_canonical_ref(canonical_ref)
+    if existing_kb and not replace_existing:
+        existing_chunks = repo.get_chunks_count(existing_kb["id"])
+        kb_sources = repo.list_sources_for_knowledgebase(existing_kb["id"])
+        if existing_chunks > 0 and kb_sources:
+            sources_created = [
+                IngestResponse(
+                    knowledgebase_id=existing_kb["id"],
+                    source_id=source["id"],
+                    source_type="website",
+                    canonical_ref=source["canonical_ref"],
+                    title=source.get("title"),
+                    status="ready",
+                    chunks_count=repo.get_chunks_count_for_source(existing_kb["id"], source["id"]),
+                    reused_existing=True,
+                    page_count=(source.get("meta") or {}).get("page_count"),
+                    crawled_pages=(source.get("meta") or {}).get("crawled_pages") or (source.get("meta") or {}).get("page_count"),
+                )
+                for source in kb_sources
+            ]
+            pages = sum(s.crawled_pages or 0 for s in sources_created)
+            _report(progress_callback, "ready", 100, "Website crawl complete")
+            return WebsiteCrawlResponse(
+                knowledgebase_id=existing_kb["id"],
+                status="ready",
+                crawl_summary=CrawlSummaryResponse(
+                    starting_url=url,
+                    normalized_url=canonical_ref,
+                    pages_attempted=pages,
+                    pages_successfully_ingested=pages,
+                    pages_skipped=0,
+                    failed_pages={},
+                    total_chunks_created=existing_chunks,
+                    warnings=["Website crawl already exists. Reused existing knowledgebase."],
+                ),
+                sources_created=sources_created,
+            )
+
     _report(progress_callback, "crawling", 10, "Crawling website")
     crawled_pages, crawl_summary = crawl_website(url, max_pages=max_pages, max_depth=max_depth)
-    
+
     if not crawled_pages:
         failure_messages = " ".join(crawl_summary.failed_pages.values()).lower()
         if "timeout" in failure_messages or "timed out" in failure_messages:
@@ -508,58 +474,9 @@ def crawl_website_ingest(
             "~20,000 characters were translated; the remainder was left in its original language."
         )
 
-    # Create a knowledgebase for the crawl
-    canonical_ref = crawl_summary.normalized_url
-    existing_kb = repo.get_knowledgebase_by_canonical_ref(canonical_ref)
-    if existing_kb:
-        existing_chunks = repo.get_chunks_count(existing_kb["id"])
-        kb_sources = repo.list_sources_for_knowledgebase(existing_kb["id"])
-        if existing_chunks > 0 and len(kb_sources) > 1:
-            vector_store = get_vector_store()
-            for source in kb_sources:
-                source_id = source["id"]
-                vector_store.delete_by_source(source_id)
-                repo.delete_source_chunks(source_id)
-                repo.delete_source(source_id)
-            repo.delete_knowledgebase_chunks(existing_kb["id"])
-            repo.delete_knowledgebase(existing_kb["id"])
-            existing_kb = None
-            existing_chunks = 0
-        if existing_chunks > 0:
-            # Reuse existing crawl
-            sources_created = []
-            for source in kb_sources:
-                sources_created.append(IngestResponse(
-                    knowledgebase_id=existing_kb["id"],
-                    source_id=source["id"],
-                    source_type="website",
-                    canonical_ref=source["canonical_ref"],
-                    title=source.get("title"),
-                    status="ready",
-                    chunks_count=repo.get_chunks_count_for_source(existing_kb["id"], source["id"]),
-                    reused_existing=True,
-                    page_count=source.get("meta", {}).get("page_count"),
-                    crawled_pages=source.get("meta", {}).get("crawled_pages") or source.get("meta", {}).get("page_count"),
-                ))
-            crawl_summary.total_chunks_created = existing_chunks
-            crawl_summary.warnings.append("Website crawl already exists. Reused existing knowledgebase.")
-            _report(progress_callback, "ready", 100, "Website crawl complete")
-            return WebsiteCrawlResponse(
-                knowledgebase_id=existing_kb["id"],
-                status="ready",
-                crawl_summary=CrawlSummaryResponse(
-                    starting_url=crawl_summary.starting_url,
-                    normalized_url=crawl_summary.normalized_url,
-                    pages_attempted=crawl_summary.pages_attempted,
-                    pages_successfully_ingested=crawl_summary.pages_successfully_ingested,
-                    pages_skipped=crawl_summary.pages_skipped,
-                    failed_pages=crawl_summary.failed_pages,
-                    total_chunks_created=existing_chunks,
-                    warnings=crawl_summary.warnings,
-                ),
-                sources_created=sources_created,
-            )
-    
+    # Old crawl (being replaced) or leftovers from a failed run make way for the new one.
+    _drop_incomplete_kb(repo, existing_kb)
+
     # Create new knowledgebase
     title = crawled_pages[0].title or safe_title_from_ref(canonical_ref)
     kb = repo.create_knowledgebase(
@@ -729,7 +646,8 @@ def ingest_github(url: str, branch: Optional[str] = None, progress_callback: Opt
                 )
 
         title = f"GitHub: {ref.owner}/{ref.repo}"
-        kb = existing_kb or repo.create_knowledgebase(name=title, source_type="github", canonical_ref=canonical_ref)
+        _drop_incomplete_kb(repo, existing_kb)
+        kb = repo.create_knowledgebase(name=title, source_type="github", canonical_ref=canonical_ref)
         kb_id = kb["id"]
 
         _report(progress_callback, "scanning", 20, "Scanning repository files")
@@ -947,39 +865,40 @@ def ingest_pdf(
 
     extraction = extract_pdf_text(filename, raw)
     title = extraction.title
-    kb = existing_kb or repo.create_knowledgebase(name=title, source_type="pdf", canonical_ref=canonical_ref)
+    _drop_incomplete_kb(repo, existing_kb)
+    kb = repo.create_knowledgebase(name=title, source_type="pdf", canonical_ref=canonical_ref)
     kb_id = kb["id"]
 
-    _report(progress_callback, "translating", 30, "Checking language and translating if needed")
-    translated_pages: list[tuple[int, str]] = []
-    translated_languages: set[str] = set()
-    failed_languages: set[str] = set()
-    truncated_languages: set[str] = set()
-    for page_number, page_text in extraction.pages:
-        translated_text, source_language, segments_ok, truncated = translate_if_needed(page_text)
-        if source_language:
-            (translated_languages if segments_ok else failed_languages).add(source_language)
-            if truncated:
-                truncated_languages.add(source_language)
-        translated_pages.append((page_number, translated_text))
-    extraction.pages = translated_pages
-    extraction.text = "\n\n".join(text for _, text in translated_pages)
-    if translated_languages:
-        extraction.warnings.append(
-            f"Translated content from {', '.join(sorted(translated_languages))} to English before indexing."
-        )
-    if failed_languages:
-        extraction.warnings.append(
-            f"Detected non-English content ({', '.join(sorted(failed_languages))}) but translation failed "
-            "(provider error); this content remains in its original language."
-        )
-    if truncated_languages:
-        extraction.warnings.append(
-            f"Some pages ({', '.join(sorted(truncated_languages))}) were long enough that only the first "
-            "~20,000 characters were translated; the remainder was left in its original language."
-        )
-
     try:
+        _report(progress_callback, "translating", 30, "Checking language and translating if needed")
+        translated_pages: list[tuple[int, str]] = []
+        translated_languages: set[str] = set()
+        failed_languages: set[str] = set()
+        truncated_languages: set[str] = set()
+        for page_number, page_text in extraction.pages:
+            translated_text, source_language, segments_ok, truncated = translate_if_needed(page_text)
+            if source_language:
+                (translated_languages if segments_ok else failed_languages).add(source_language)
+                if truncated:
+                    truncated_languages.add(source_language)
+            translated_pages.append((page_number, translated_text))
+        extraction.pages = translated_pages
+        extraction.text = "\n\n".join(text for _, text in translated_pages)
+        if translated_languages:
+            extraction.warnings.append(
+                f"Translated content from {', '.join(sorted(translated_languages))} to English before indexing."
+            )
+        if failed_languages:
+            extraction.warnings.append(
+                f"Detected non-English content ({', '.join(sorted(failed_languages))}) but translation failed "
+                "(provider error); this content remains in its original language."
+            )
+        if truncated_languages:
+            extraction.warnings.append(
+                f"Some pages ({', '.join(sorted(truncated_languages))}) were long enough that only the first "
+                "~20,000 characters were translated; the remainder was left in its original language."
+            )
+
         source = repo.create_source(
             knowledgebase_id=kb_id,
             source_type="pdf",
