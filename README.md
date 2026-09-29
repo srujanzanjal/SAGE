@@ -42,7 +42,8 @@ Backend:
 
 AI / NLP:
 - sentence-transformers (all-MiniLM-L6-v2)
-- Groq API (LLM provider)
+- Google Gemini API (primary LLM, free tier)
+- Groq API (automatic fallback LLM, free tier)
 
 Database & Storage:
 - Supabase (Postgres metadata)
@@ -144,6 +145,7 @@ Required (copy `backend/.env.example` to `backend/.env`):
 ```
 SUPABASE_URL=
 SUPABASE_KEY=
+GEMINI_API_KEY=
 GROQ_API_KEY=
 STORE_QUERY_HISTORY=false
 WHISPER_MODEL_SIZE=tiny
@@ -216,7 +218,7 @@ npm run build
 - Auto-transcription can be slow on CPU
 - Scanned PDFs need OCR (future work)
 - Private GitHub repos not supported
-- External LLM provider may rate-limit repeated QA
+- Free-tier LLM quotas: if Gemini is rate-limited, SAGE falls back to Groq automatically
 
 ## Future work
 

@@ -128,6 +128,34 @@ class VectorStore:
             lines = lines[1:]
         return "\n".join(lines).strip() or None
 
+    def get_overview_chunks(self, source_ids: list[str]) -> list[RetrievedChunk]:
+        """Overview chunks for the given sources, fetched by metadata (no search)."""
+        result = self.collection.get(
+            where={"$and": [{"source_id": {"$in": list(source_ids)}}, {"chunk_kind": "source_overview"}]},
+            include=["documents", "metadatas"],
+        )
+        return [
+            RetrievedChunk(chunk_id=str(meta.get("chunk_id")), text=doc, metadata=dict(meta), distance=1.0, semantic_score=0.0)
+            for doc, meta in zip(result.get("documents") or [], result.get("metadatas") or [])
+        ]
+
+    def get_edge_chunks(self, source_id: str, *, from_end: bool, count: int = 2) -> list[RetrievedChunk]:
+        """First or last content chunks of a source by position (overview excluded)."""
+        result = self.collection.get(where={"source_id": source_id}, include=["documents", "metadatas"])
+        rows = sorted(
+            (
+                (meta, doc)
+                for doc, meta in zip(result.get("documents") or [], result.get("metadatas") or [])
+                if meta.get("chunk_kind") != "source_overview"
+            ),
+            key=lambda row: int(row[0].get("chunk_index", 0)),
+        )
+        picked = rows[-count:] if from_end else rows[:count]
+        return [
+            RetrievedChunk(chunk_id=str(meta.get("chunk_id")), text=doc, metadata=dict(meta), distance=1.0, semantic_score=0.0)
+            for meta, doc in picked
+        ]
+
     def delete_by_source(self, source_id: str) -> None:
         self.collection.delete(where={"source_id": source_id})
 

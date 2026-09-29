@@ -19,6 +19,12 @@ class FakeEmbeddingService:
 
 
 class FakeVectorStore:
+    def get_overview_chunks(self, source_ids):
+        return []
+
+    def get_edge_chunks(self, source_id, from_end, count=2):
+        return []
+
     def __init__(self):
         self.calls = []
 

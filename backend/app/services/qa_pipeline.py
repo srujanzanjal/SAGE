@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from time import perf_counter
@@ -8,7 +9,7 @@ from app.core.config import get_settings
 from app.models.schemas import AnswerResponse, Citation, QuestionRequest
 from app.services.confidence import calculate_confidence, confidence_label_and_reason
 from app.services.embeddings import get_embedding_service
-from app.services.llm import LLMServiceTimeoutError, get_llm_service, should_rewrite
+from app.services.llm import LLMServiceTimeoutError, get_llm_service
 from app.services.reranker import rerank_chunks
 from app.services.supabase_repo import get_supabase_repository
 from app.services.text_utils import make_snippet
@@ -16,7 +17,6 @@ from app.services.retrieval_types import RetrievedChunk
 from app.services.vector_store import get_vector_store
 
 
-LOW_CONFIDENCE_THRESHOLD = 0.28
 GITHUB_QA_TOP_K = 6
 GITHUB_QA_MAX_SEARCH_RESULTS = 8
 GITHUB_QA_MAX_CONTEXT_CHARS = 10_000
@@ -40,6 +40,18 @@ def _build_follow_up_question(question: str, ranked_chunks: list[RetrievedChunk]
     if ranked_chunks and ranked_chunks[0].metadata.get("source_type") == "video":
         return "Would you like a summary, a topic overview, or help finding a specific timestamp?"
     return "Could you be more specific about what you want to know from this source?"
+
+
+_END_WORDS = re.compile(r"\b(at the end|in the end|ending|conclu\w*|final(ly)?|last part|closing|wrap(s|ped)? up)\b", re.I)
+_START_WORDS = re.compile(r"\b(at the (start|beginning)|beginning|opening|intro(duction)?|starts? (with|by)|first part)\b", re.I)
+
+
+def _position_asked(text: str) -> str | None:
+    if _END_WORDS.search(text):
+        return "end"
+    if _START_WORDS.search(text):
+        return "start"
+    return None
 
 
 def _truncate_text(text: str, max_chars: int) -> str:
@@ -98,26 +110,26 @@ def _overview_label(metadata: dict[str, object]) -> str:
     }.get(overview_type, "Source Overview")
 
 
-def _resolve_source_type(request: QuestionRequest, repo) -> str | None:
+def _resolve_source_type(request: QuestionRequest, repo) -> tuple[str | None, list[str]]:
+    """Return (shared source type or None, titles of the selected sources)."""
+    rows = []
     if request.source_ids:
-        types = set()
-        for source_id in request.source_ids:
-            source = repo.get_source(source_id)
-            if source and source.get("source_type"):
-                types.add(str(source.get("source_type")))
+        rows = [repo.get_source(source_id) for source_id in request.source_ids]
+    elif request.source_id:
+        rows = [repo.get_source(request.source_id)]
+    rows = [row for row in rows if row]
+    titles = [str(row.get("title")) for row in rows if row.get("title")]
+    if rows:
+        types = {str(row.get("source_type")) for row in rows if row.get("source_type")}
         # Only apply source-type-specific tuning (e.g. GitHub's tighter budget)
         # when every combined source shares the same type; a mixed-type
         # question gets the generic budget.
-        return types.pop() if len(types) == 1 else None
-    if request.source_id:
-        source = repo.get_source(request.source_id)
-        if source and source.get("source_type"):
-            return str(source.get("source_type"))
+        return (types.pop() if len(types) == 1 else None), titles
     if request.knowledgebase_id:
         knowledgebase = repo.get_knowledgebase(request.knowledgebase_id)
-        if knowledgebase and knowledgebase.get("source_type"):
-            return str(knowledgebase.get("source_type"))
-    return None
+        if knowledgebase:
+            return knowledgebase.get("source_type"), [knowledgebase["name"]] if knowledgebase.get("name") else []
+    return None, titles
 
 
 def build_context(
@@ -145,7 +157,9 @@ def build_context(
             context_lines.extend([
                 f"Chunk ID: {chunk.chunk_id}",
                 f"Snippet: {snippet}",
-                f"Text:\n{chunk.text}",  # Include full overview text, not truncated
+                # Older ingests stored whole pages in the overview; cap it so it
+                # can't crowd every other chunk out of the context budget.
+                f"Text:\n{_truncate_text(chunk.text, max_chunk_chars * 2)}",
             ])
         else:
             source_label = metadata.get("source_title") or metadata.get("source_ref") or "Unknown source"
@@ -247,7 +261,7 @@ class _RetrievalContext:
 
 
 def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _RetrievalContext:
-    source_type = _resolve_source_type(request, repo)
+    source_type, source_titles = _resolve_source_type(request, repo)
     is_github_source = source_type == "github"
     effective_top_k = min(request.top_k, GITHUB_QA_TOP_K) if is_github_source else request.top_k
     search_top_k = min(max(effective_top_k * 2, effective_top_k), GITHUB_QA_MAX_SEARCH_RESULTS) if is_github_source else max(request.top_k * 2, request.top_k)
@@ -263,21 +277,29 @@ def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _Retriev
     history_dicts = [turn.model_dump() for turn in request.history] if request.history else None
 
     rewritten_query = request.question
-    if should_rewrite(request.question):
-        try:
-            rewritten_query = llm.rewrite_query(request.question, history=history_dicts)
-        except LLMServiceTimeoutError:
-            rewritten_query = request.question
-            logger.warning("qa_rewrite_timeout source_type=%s top_k=%s", source_type or "unknown", effective_top_k)
+    try:
+        rewritten_query = llm.rewrite_query(request.question, history=history_dicts, source_titles=source_titles)
+    except LLMServiceTimeoutError:
+        logger.warning("qa_rewrite_timeout source_type=%s top_k=%s", source_type or "unknown", effective_top_k)
 
-    query_embedding = get_embedding_service().embed_query(rewritten_query)
-    raw_chunks = get_vector_store().search(
-        query_embedding=query_embedding,
-        knowledgebase_id=request.knowledgebase_id,
-        source_id=request.source_id,
-        source_ids=request.source_ids,
-        top_k=search_top_k,
-    )
+    # Search with both the user's own wording (keeps exact terms/identifiers) and
+    # the rewrite (fixes typos, follow-up references, non-English phrasing),
+    # keeping each chunk's best semantic hit.
+    embedder = get_embedding_service()
+    vector_store = get_vector_store()
+    merged: dict[str, RetrievedChunk] = {}
+    for query in dict.fromkeys([request.question, rewritten_query]):
+        for chunk in vector_store.search(
+            query_embedding=embedder.embed_query(query),
+            knowledgebase_id=request.knowledgebase_id,
+            source_id=request.source_id,
+            source_ids=request.source_ids,
+            top_k=search_top_k,
+        ):
+            kept = merged.get(chunk.chunk_id)
+            if kept is None or chunk.semantic_score > kept.semantic_score:
+                merged[chunk.chunk_id] = chunk
+    raw_chunks = list(merged.values())
     retrieval_ms = (perf_counter() - retrieval_started) * 1000
 
     rerank_started = perf_counter()
@@ -288,6 +310,26 @@ def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _Retriev
 
     confidence = calculate_confidence(ranked_chunks)
     confidence_label, confidence_reason = confidence_label_and_reason(rewritten_query, ranked_chunks, confidence)
+
+    # Each source's overview (title, headings, opening text) answers "what is
+    # this / what does X stand for / who wrote it" questions that rarely match a
+    # single passage, so always hand it to the model. Added after scoring so it
+    # never inflates confidence.
+    selected_ids = request.source_ids or ([request.source_id] if request.source_id else [])
+    if ranked_chunks and 0 < len(selected_ids) <= 3:
+        present = {c.chunk_id for c in ranked_chunks}
+        ranked_chunks = ranked_chunks + [
+            c for c in vector_store.get_overview_chunks(selected_ids) if c.chunk_id not in present
+        ]
+        # "What does he say at the end?" is about position, which semantic search
+        # can't see: hand over the actual first/last chunks for such questions.
+        position = _position_asked(request.question + " " + rewritten_query)
+        if position is not None and len(selected_ids) == 1:
+            present = {c.chunk_id for c in ranked_chunks}
+            ranked_chunks = ranked_chunks + [
+                c for c in vector_store.get_edge_chunks(selected_ids[0], from_end=position == "end")
+                if c.chunk_id not in present
+            ]
 
     follow_up_question = None
     context = ""
@@ -304,20 +346,16 @@ def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _Retriev
         base_warnings = ["No relevant transcript evidence found."]
         follow_up_question = _build_follow_up_question(request.question, ranked_chunks)
     else:
-        # For video sources, allow grounded answers even when confidence is low
+        # Low retrieval scores often just mean the question is worded differently
+        # from the source, so always let the LLM judge the evidence: the grounded
+        # prompt makes it say so when the answer really isn't there. Weak matches
+        # are flagged with a warning below instead of refusing up front.
         is_video = source_type == "video" or any((c.metadata.get("source_type") == "video" or c.metadata.get("chunk_kind") == "video_overview") for c in ranked_chunks)
-        if request.mode == "grounded" and confidence < LOW_CONFIDENCE_THRESHOLD and not is_video:
-            should_generate = False
-            preset_answer = "I couldn't produce a reliable grounded answer from the selected source."
-            base_warnings = ["Low retrieval confidence. No grounded answer was generated."]
-            follow_up_question = _build_follow_up_question(request.question, ranked_chunks)
-        else:
-            # Build context. For low-confidence video answers, still generate but flag it below.
-            context, citations = build_context(
-                ranked_chunks,
-                max_context_chars=max_context_chars,
-                max_chunk_chars=max_chunk_chars,
-            )
+        context, citations = build_context(
+            ranked_chunks,
+            max_context_chars=max_context_chars,
+            max_chunk_chars=max_chunk_chars,
+        )
 
     retrieved_sources = [
         {

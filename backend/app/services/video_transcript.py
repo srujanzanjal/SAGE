@@ -98,7 +98,7 @@ def _fetch_transcript_lines(video_id: str) -> list[TranscriptLine]:
     api = YouTubeTranscriptApi()
 
     try:
-        transcript_list = api.list_transcripts(video_id)
+        transcript_list = api.list(video_id)
     except Exception as exc:
         raise TranscriptUnavailableError("Transcript not available from YouTube.") from exc
 

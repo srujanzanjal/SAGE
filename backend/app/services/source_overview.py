@@ -39,10 +39,16 @@ def _top_terms(texts: Iterable[str], limit: int = 6) -> str:
     return ", ".join(word for word, _ in counter.most_common(limit))
 
 
+EXCERPT_MAX_CHARS = 600
+
+
 def _first_last_excerpt(texts: list[str], limit: int = 2) -> tuple[list[str], list[str]]:
+    # Excerpts, not whole pages: an overview is one chunk and must stay small
+    # enough to sit in the QA context next to the real evidence.
     if not texts:
         return [], []
-    return texts[:limit], texts[-limit:]
+    cap = lambda rows: [t[:EXCERPT_MAX_CHARS] for t in rows]
+    return cap(texts[:limit]), cap(texts[-limit:])
 
 
 def _make_chunk(text: str, *, source_type: str, overview_type: str, source_ref: str, title: str, metadata: dict[str, Any]) -> TextChunk:
@@ -135,7 +141,7 @@ def generate_website_overview(
         lines.append("ENDING EXCERPT:")
         lines.extend(last_rows)
     if themes:
-        lines.append("TRANSCRIPT THEMES:")
+        lines.append("MAIN TOPICS:")
         lines.append(themes)
     return "\n".join(lines)
 

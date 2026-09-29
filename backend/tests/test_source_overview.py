@@ -29,6 +29,12 @@ class FakeEmbeddingService:
 
 
 class FakeVectorStore:
+    def get_overview_chunks(self, source_ids):
+        return []
+
+    def get_edge_chunks(self, source_id, from_end, count=2):
+        return []
+
     def __init__(self):
         self.calls = []
 
@@ -263,3 +269,9 @@ def test_ingest_video_auto_transcribe_reuses_existing_source(monkeypatch):
     assert result.source_id == "src_existing"
     assert result.chunks_count == 8
     assert not fake_vectors.calls
+
+def test_position_questions_are_detected():
+    assert qa_pipeline._position_asked("what is his advice at the end") == "end"
+    assert qa_pipeline._position_asked("how does the talk conclude?") == "end"
+    assert qa_pipeline._position_asked("what does he say in the intro") == "start"
+    assert qa_pipeline._position_asked("what is RAG") is None

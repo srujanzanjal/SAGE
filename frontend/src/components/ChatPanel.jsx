@@ -6,6 +6,12 @@ import ModeSelector from "./ModeSelector";
 
 const SOURCE_ICON = { pdf: FileText, video: Video, github: GitBranch, website: Globe2 };
 const MAX_HISTORY_TURNS = 6;
+const STARTER_QUESTIONS = {
+  website: ["What is this website about?", "Summarize the key points", "How do I contact them?"],
+  pdf: ["Summarize this document", "What are the main conclusions?", "Explain it simply for a beginner"],
+  video: ["What is this video about?", "List the main points with timestamps", "What is the key takeaway?"],
+  github: ["What does this repo do?", "How do I run it locally?", "Explain the project structure"],
+};
 
 function SourceChip({ source, onRemove }) {
   const Icon = SOURCE_ICON[source.source_type] || Globe2;
@@ -240,6 +246,25 @@ export default function ChatPanel({ selectedSource, allSources = [] }) {
             </div>
           ))}
           <div ref={threadEndRef} />
+        </div>
+      )}
+
+      {messages.length === 0 && activeSources.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {(activeSources.length > 1
+            ? ["Summarize each source", "How do these sources relate?", "What do they have in common?"]
+            : STARTER_QUESTIONS[activeSources[0].source_type] || STARTER_QUESTIONS.website
+          ).map((starter) => (
+            <button
+              type="button"
+              key={starter}
+              onClick={() => submitQuestion(starter)}
+              disabled={loading}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-60"
+            >
+              {starter}
+            </button>
+          ))}
         </div>
       )}
 
