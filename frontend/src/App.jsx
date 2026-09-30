@@ -4,7 +4,7 @@ import ChatPanel from "./components/ChatPanel";
 import LandingPage from "./components/LandingPage";
 import SourceIngestPanel from "./components/SourceIngestPanel";
 import SourceList from "./components/SourceList";
-import SummaryCard from "./components/SummaryCard";
+import SourceBrief from "./components/SourceBrief";
 import { deleteKnowledgebase, deleteSource, getJobStatus, listSources, recrawlWebsite } from "./lib/api";
 
 const MODULES = {
@@ -48,6 +48,8 @@ export default function App() {
 
   const currentModule = selectedType ? MODULES[selectedType] : null;
   const [ingestOpen, setIngestOpen] = useState(false);
+  // A question picked in the Source Brief, handed to the chat to ask.
+  const [askRequest, setAskRequest] = useState(null);
   const showIngest = ingestOpen || filteredSources.length === 0;
 
   async function refreshSources() {
@@ -338,9 +340,9 @@ export default function App() {
               </div>
             </div>
 
-            <SummaryCard source={selectedSource} />
+            <SourceBrief source={selectedSource} onAsk={(text) => setAskRequest({ text, id: Date.now() })} />
 
-            <ChatPanel selectedSource={selectedSource} allSources={sources} />
+            <ChatPanel selectedSource={selectedSource} allSources={sources} askRequest={askRequest} />
           </div>
         </div>
       </div>

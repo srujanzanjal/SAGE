@@ -33,7 +33,7 @@ function SourceChip({ source, onRemove }) {
   );
 }
 
-export default function ChatPanel({ selectedSource, allSources = [] }) {
+export default function ChatPanel({ selectedSource, allSources = [], askRequest = null }) {
   const [mode, setMode] = useState("grounded");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]); // [{ question, answer }]
@@ -156,13 +156,22 @@ export default function ChatPanel({ selectedSource, allSources = [] }) {
     }
   }
 
+  const sectionRef = useRef(null);
+  useEffect(() => {
+    if (!askRequest?.text) return;
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    submitQuestion(askRequest.text);
+    // Only a new request should trigger this, not unrelated re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askRequest?.id]);
+
   function handleSubmit(event) {
     event.preventDefault();
     submitQuestion(question);
   }
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section ref={sectionRef} className="scroll-mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Ask questions</p>

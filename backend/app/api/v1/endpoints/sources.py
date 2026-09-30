@@ -5,10 +5,13 @@ from app.models.schemas import (
     KnowledgebaseGroup,
     RecrawlRequest,
     SourceDetail,
+    SourceBrief,
     SourceOverviewResponse,
     SourceSummary,
 )
 from app.services.ingestion_jobs import start_website_recrawl_job
+from app.services.llm import LLMServiceTimeoutError
+from app.services.source_brief import get_source_brief
 from app.services.source_management import (
     delete_knowledgebase,
     delete_source,
@@ -84,6 +87,19 @@ def get_source_summary_endpoint(source_id: str):
         return SourceOverviewResponse(summary=get_vector_store().get_overview_text(source_id))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Could not load source summary: {exc}") from exc
+
+
+@router.get("/{source_id}/brief", response_model=SourceBrief)
+def get_source_brief_endpoint(source_id: str, refresh: bool = False):
+    try:
+        return get_source_brief(source_id, refresh=refresh)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMServiceTimeoutError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        # The model returned something that wasn't a usable brief; retrying usually works.
+        raise HTTPException(status_code=502, detail=f"Could not build the brief, please retry: {exc}") from exc
 
 
 @router.get("/knowledgebases/{knowledgebase_id}", response_model=KnowledgebaseDetail)

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.models.schemas import AnswerResponse, QuestionRequest
+from app.models.schemas import AnswerResponse, EvidenceRequest, EvidenceResponse, QuestionRequest
+from app.services.evidence import find_evidence
 from app.services.qa_pipeline import answer_question, format_sse_event, stream_answer_question
 
 router = APIRouter(prefix="/qa", tags=["question-answering"])
@@ -40,3 +41,11 @@ def ask_question_stream(payload: QuestionRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/evidence", response_model=EvidenceResponse)
+def evidence(payload: EvidenceRequest):
+    try:
+        return find_evidence(payload.chunk_id, payload.claims)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
