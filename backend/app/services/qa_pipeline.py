@@ -260,7 +260,17 @@ class _RetrievalContext:
     context_chars: int
 
 
-def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _RetrievalContext:
+def _retrieve_and_build_context(
+    request: QuestionRequest,
+    repo,
+    llm,
+    *,
+    rewrite: bool = True,
+    hybrid: bool = True,
+    extras: bool = True,
+) -> _RetrievalContext:
+    """rewrite/hybrid/extras switch off pipeline stages for the evaluation
+    ablation (backend/eval); the app always runs with every stage on."""
     source_type, source_titles = _resolve_source_type(request, repo)
     is_github_source = source_type == "github"
     effective_top_k = min(request.top_k, GITHUB_QA_TOP_K) if is_github_source else request.top_k
@@ -278,7 +288,8 @@ def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _Retriev
 
     rewritten_query = request.question
     try:
-        rewritten_query = llm.rewrite_query(request.question, history=history_dicts, source_titles=source_titles)
+        if rewrite:
+            rewritten_query = llm.rewrite_query(request.question, history=history_dicts, source_titles=source_titles)
     except LLMServiceTimeoutError:
         logger.warning("qa_rewrite_timeout source_type=%s top_k=%s", source_type or "unknown", effective_top_k)
 
@@ -303,9 +314,13 @@ def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _Retriev
     retrieval_ms = (perf_counter() - retrieval_started) * 1000
 
     rerank_started = perf_counter()
-    ranked_chunks = _apply_source_diversity_floor(
-        rerank_chunks(rewritten_query, raw_chunks), effective_top_k, request.source_ids
-    )
+    if hybrid:
+        reranked = rerank_chunks(rewritten_query, raw_chunks)
+    else:
+        for chunk in raw_chunks:
+            chunk.score = chunk.semantic_score
+        reranked = sorted(raw_chunks, key=lambda c: c.score, reverse=True)
+    ranked_chunks = _apply_source_diversity_floor(reranked, effective_top_k, request.source_ids)
     rerank_ms = (perf_counter() - rerank_started) * 1000
 
     confidence = calculate_confidence(ranked_chunks)
@@ -316,7 +331,7 @@ def _retrieve_and_build_context(request: QuestionRequest, repo, llm) -> _Retriev
     # single passage, so always hand it to the model. Added after scoring so it
     # never inflates confidence.
     selected_ids = request.source_ids or ([request.source_id] if request.source_id else [])
-    if ranked_chunks and 0 < len(selected_ids) <= 3:
+    if extras and ranked_chunks and 0 < len(selected_ids) <= 3:
         present = {c.chunk_id for c in ranked_chunks}
         ranked_chunks = ranked_chunks + [
             c for c in vector_store.get_overview_chunks(selected_ids) if c.chunk_id not in present

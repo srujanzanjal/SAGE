@@ -1,0 +1,709 @@
+{
+ "sources": {
+  "pdf": "ee8bac29-3b51-4e3a-8894-44868a46e690",
+  "video": "11a3fc08-5254-4620-b377-69e5263fd06a",
+  "repo": "77d9b8bf-1206-4e63-84d9-918610cdca6e",
+  "wiki": "4b77f1b7-36b9-42ad-9f76-c81f7a506b3f",
+  "college": "feb10823-8287-47e1-bdce-48783c6dffaa",
+  "python": "631f6259-a071-4d66-bbe3-5500ab34dbc1"
+ },
+ "items": [
+  {
+   "id": "pdf-01",
+   "sources": [
+    "pdf"
+   ],
+   "category": "factual",
+   "question": "What does SAGE stand for?",
+   "evidence": [
+    "Semantic Analysis and Generation Engine"
+   ],
+   "answer_keywords": [
+    "Semantic Analysis and Generation Engine"
+   ]
+  },
+  {
+   "id": "pdf-02",
+   "sources": [
+    "pdf"
+   ],
+   "category": "typo",
+   "question": "which vector db do they use",
+   "evidence": [
+    "ChromaDB"
+   ],
+   "answer_keywords": [
+    "Chroma"
+   ]
+  },
+  {
+   "id": "pdf-03",
+   "sources": [
+    "pdf"
+   ],
+   "category": "factual",
+   "question": "Where is source and chunk metadata stored?",
+   "evidence": [
+    "Supabase"
+   ],
+   "answer_keywords": [
+    "Supabase"
+   ]
+  },
+  {
+   "id": "pdf-04",
+   "sources": [
+    "pdf"
+   ],
+   "category": "paraphrase",
+   "question": "how does it stop one source from hogging all the answer slots when combining sources",
+   "evidence": [
+    "diversity floor"
+   ],
+   "answer_keywords": [
+    "diversity floor",
+    "reserve"
+   ]
+  },
+  {
+   "id": "pdf-05",
+   "sources": [
+    "pdf"
+   ],
+   "category": "factual",
+   "question": "Which sentence embedding model does SAGE use?",
+   "evidence": [
+    "all-MiniLM-L6-v2"
+   ],
+   "answer_keywords": [
+    "MiniLM"
+   ]
+  },
+  {
+   "id": "pdf-06",
+   "sources": [
+    "pdf"
+   ],
+   "category": "factual",
+   "question": "What weight does the best retrieval score get in the confidence formula?",
+   "evidence": [
+    "0.65"
+   ],
+   "answer_keywords": [
+    "0.65"
+   ]
+  },
+  {
+   "id": "pdf-07",
+   "sources": [
+    "pdf"
+   ],
+   "category": "hindi",
+   "question": "SAGE किन चार प्रकार के स्रोतों को ingest करता है?",
+   "evidence": [
+    "four structurally different source types",
+    "ingests four source types"
+   ],
+   "answer_keywords": [
+    "GitHub",
+    "रिपॉजिटरी",
+    "repositor",
+    "गिटहब"
+   ]
+  },
+  {
+   "id": "pdf-08",
+   "sources": [
+    "pdf"
+   ],
+   "category": "summary",
+   "question": "tldr of this paper",
+   "evidence": [
+    "SAGE"
+   ],
+   "answer_keywords": [
+    "SAGE"
+   ],
+   "skip_retrieval": true
+  },
+  {
+   "id": "video-01",
+   "sources": [
+    "video"
+   ],
+   "category": "factual",
+   "question": "Who drives the procrastinator to waste time?",
+   "evidence": [
+    "Instant Gratification Monkey"
+   ],
+   "answer_keywords": [
+    "Monkey"
+   ]
+  },
+  {
+   "id": "video-02",
+   "sources": [
+    "video"
+   ],
+   "category": "typo",
+   "question": "wat is the panic monster",
+   "evidence": [
+    "Panic Monster"
+   ],
+   "answer_keywords": [
+    "deadline"
+   ]
+  },
+  {
+   "id": "video-03",
+   "sources": [
+    "video"
+   ],
+   "category": "paraphrase",
+   "question": "what's the monkey thing he talks about",
+   "evidence": [
+    "Instant Gratification Monkey"
+   ],
+   "answer_keywords": [
+    "Instant Gratification"
+   ]
+  },
+  {
+   "id": "video-04",
+   "sources": [
+    "video"
+   ],
+   "category": "factual",
+   "question": "How long was the senior thesis he had to write?",
+   "evidence": [
+    "90-page"
+   ],
+   "answer_keywords": [
+    "90"
+   ]
+  },
+  {
+   "id": "video-05",
+   "sources": [
+    "video"
+   ],
+   "category": "position",
+   "question": "what is his advice at the end",
+   "evidence": [
+    "Life Calendar"
+   ],
+   "answer_keywords": [
+    "Life Calendar",
+    "calendar"
+   ]
+  },
+  {
+   "id": "video-06",
+   "sources": [
+    "video"
+   ],
+   "category": "hindi",
+   "question": "Rational Decision-Maker kya karta hai?",
+   "evidence": [
+    "Rational Decision-Maker"
+   ],
+   "answer_keywords": [
+    "decision",
+    "निर्णय",
+    "फैसले",
+    "rational"
+   ]
+  },
+  {
+   "id": "video-07",
+   "sources": [
+    "video"
+   ],
+   "category": "factual",
+   "question": "How many boxes does one row of the life calendar represent?",
+   "evidence": [
+    "one box for every week"
+   ],
+   "answer_keywords": [
+    "week"
+   ]
+  },
+  {
+   "id": "video-08",
+   "sources": [
+    "video"
+   ],
+   "category": "vague",
+   "question": "what is this video about",
+   "evidence": [
+    "procrastinat"
+   ],
+   "answer_keywords": [
+    "procrastinat"
+   ],
+   "skip_retrieval": true
+  },
+  {
+   "id": "repo-01",
+   "sources": [
+    "repo"
+   ],
+   "category": "vague",
+   "question": "what does this repo do",
+   "evidence": [
+    "SQL"
+   ],
+   "answer_keywords": [
+    "SQL"
+   ],
+   "skip_retrieval": true
+  },
+  {
+   "id": "repo-02",
+   "sources": [
+    "repo"
+   ],
+   "category": "factual",
+   "question": "how do i install it",
+   "evidence": [
+    "pipenv install records"
+   ],
+   "answer_keywords": [
+    "install records",
+    "pip"
+   ]
+  },
+  {
+   "id": "repo-03",
+   "sources": [
+    "repo"
+   ],
+   "category": "paraphrase",
+   "question": "how to export query results to csv?",
+   "evidence": [
+    "export('csv')"
+   ],
+   "answer_keywords": [
+    "export"
+   ]
+  },
+  {
+   "id": "repo-04",
+   "sources": [
+    "repo"
+   ],
+   "category": "factual",
+   "question": "which databases does it support",
+   "evidence": [
+    "RedShift"
+   ],
+   "answer_keywords": [
+    "Postgres",
+    "MySQL",
+    "SQLite"
+   ]
+  },
+  {
+   "id": "repo-05",
+   "sources": [
+    "repo"
+   ],
+   "category": "factual",
+   "question": "Which library does Records use to connect to databases?",
+   "evidence": [
+    "SQLAlchemy"
+   ],
+   "answer_keywords": [
+    "SQLAlchemy"
+   ]
+  },
+  {
+   "id": "repo-06",
+   "sources": [
+    "repo"
+   ],
+   "category": "hindi",
+   "question": "records library ko database se kaise connect karte hai?",
+   "evidence": [
+    "records.Database("
+   ],
+   "answer_keywords": [
+    "Database("
+   ]
+  },
+  {
+   "id": "repo-07",
+   "sources": [
+    "repo"
+   ],
+   "category": "factual",
+   "question": "What formats can query results be exported to?",
+   "evidence": [
+    "xlsx"
+   ],
+   "answer_keywords": [
+    "xlsx",
+    "json",
+    "yaml"
+   ]
+  },
+  {
+   "id": "wiki-01",
+   "sources": [
+    "wiki"
+   ],
+   "category": "factual",
+   "question": "What is retrieval augmented generation?",
+   "evidence": [
+    "is a technique that enables large language models"
+   ],
+   "answer_keywords": [
+    "retriev"
+   ]
+  },
+  {
+   "id": "wiki-02",
+   "sources": [
+    "wiki"
+   ],
+   "category": "typo",
+   "question": "wat problm does rag solv",
+   "evidence": [
+    "hallucination"
+   ],
+   "answer_keywords": [
+    "hallucinat",
+    "outdated",
+    "up-to-date",
+    "domain"
+   ]
+  },
+  {
+   "id": "wiki-03",
+   "sources": [
+    "wiki"
+   ],
+   "category": "hindi",
+   "question": "RAG kya hai aur kyu use karte hai?",
+   "evidence": [
+    "is a technique that enables large language models"
+   ],
+   "answer_keywords": [
+    "RAG"
+   ]
+  },
+  {
+   "id": "wiki-04",
+   "sources": [
+    "wiki"
+   ],
+   "category": "vague",
+   "question": "who came up with it?",
+   "evidence": [
+    "Lewis"
+   ],
+   "answer_keywords": [
+    "Lewis"
+   ],
+   "skip_retrieval": true
+  },
+  {
+   "id": "wiki-05",
+   "sources": [
+    "wiki"
+   ],
+   "category": "factual",
+   "question": "In which year was the term RAG introduced?",
+   "evidence": [
+    "was introduced in a 2020 paper"
+   ],
+   "answer_keywords": [
+    "2020"
+   ]
+  },
+  {
+   "id": "wiki-06",
+   "sources": [
+    "wiki"
+   ],
+   "category": "summary",
+   "question": "tldr",
+   "evidence": [
+    "Retrieval-augmented generation"
+   ],
+   "answer_keywords": [
+    "retriev"
+   ],
+   "skip_retrieval": true
+  },
+  {
+   "id": "wiki-07",
+   "sources": [
+    "wiki"
+   ],
+   "category": "factual",
+   "question": "Does RAG completely eliminate hallucinations?",
+   "evidence": [
+    "does not prevent hallucinations"
+   ],
+   "answer_keywords": [
+    "not",
+    "no",
+    "does not",
+    "cannot"
+   ]
+  },
+  {
+   "id": "college-01",
+   "sources": [
+    "college"
+   ],
+   "category": "typo",
+   "question": "admission contact number?",
+   "evidence": [
+    "7743979315"
+   ],
+   "answer_keywords": [
+    "7743979315",
+    "774 397 9315",
+    "77439 79315"
+   ]
+  },
+  {
+   "id": "college-02",
+   "sources": [
+    "college"
+   ],
+   "category": "factual",
+   "question": "where is the college located",
+   "evidence": [
+    "Wardha Road"
+   ],
+   "answer_keywords": [
+    "Nagpur"
+   ]
+  },
+  {
+   "id": "college-03",
+   "sources": [
+    "college"
+   ],
+   "category": "typo",
+   "question": "what courses r offered",
+   "evidence": [
+    "B.Tech Engineering, Sciences and Humanities"
+   ],
+   "answer_keywords": [
+    "Computer Science"
+   ]
+  },
+  {
+   "id": "college-04",
+   "sources": [
+    "college"
+   ],
+   "category": "hindi",
+   "question": "कॉलेज कहाँ स्थित है?",
+   "evidence": [
+    "Wardha Road"
+   ],
+   "answer_keywords": [
+    "नागपुर",
+    "Nagpur"
+   ]
+  },
+  {
+   "id": "college-05",
+   "sources": [
+    "college"
+   ],
+   "category": "factual",
+   "question": "What is the PIN code of the college?",
+   "evidence": [
+    "441108"
+   ],
+   "answer_keywords": [
+    "441108"
+   ]
+  },
+  {
+   "id": "python-01",
+   "sources": [
+    "python"
+   ],
+   "category": "paraphrase",
+   "question": "is python free to use?",
+   "evidence": [
+    "OSI-approved"
+   ],
+   "answer_keywords": [
+    "open source",
+    "free"
+   ]
+  },
+  {
+   "id": "python-02",
+   "sources": [
+    "python"
+   ],
+   "category": "factual",
+   "question": "Who administers Python's license?",
+   "evidence": [
+    "administered by the Python Software Foundation"
+   ],
+   "answer_keywords": [
+    "Python Software Foundation"
+   ]
+  },
+  {
+   "id": "python-03",
+   "sources": [
+    "python"
+   ],
+   "category": "vague",
+   "question": "what's this page about",
+   "evidence": [
+    "Python"
+   ],
+   "answer_keywords": [
+    "Python"
+   ],
+   "skip_retrieval": true
+  },
+  {
+   "id": "multi-01",
+   "sources": [
+    "pdf",
+    "wiki"
+   ],
+   "category": "multi",
+   "question": "Compare what the paper says about RAG with the Wikipedia article",
+   "evidence": [
+    "is a technique that enables large language models",
+    "introduced conditioning a generator"
+   ],
+   "evidence_all": true,
+   "answer_keywords": [
+    "SAGE"
+   ]
+  },
+  {
+   "id": "multi-02",
+   "sources": [
+    "repo",
+    "python"
+   ],
+   "category": "multi",
+   "question": "Is Records written in Python and is Python free to use?",
+   "evidence": [
+    "administered by the Python Software Foundation",
+    "import records"
+   ],
+   "evidence_all": true,
+   "answer_keywords": [
+    "open source",
+    "free"
+   ]
+  },
+  {
+   "id": "none-01",
+   "sources": [
+    "pdf"
+   ],
+   "category": "unanswerable",
+   "question": "who won the 2022 world cup",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-02",
+   "sources": [
+    "wiki"
+   ],
+   "category": "unanswerable",
+   "question": "what is the capital of france?",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-03",
+   "sources": [
+    "python"
+   ],
+   "category": "unanswerable",
+   "question": "who created python",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-04",
+   "sources": [
+    "video"
+   ],
+   "category": "unanswerable",
+   "question": "What is Tim Urban's phone number?",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-05",
+   "sources": [
+    "repo"
+   ],
+   "category": "unanswerable",
+   "question": "How many GitHub stars does this repo have?",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-06",
+   "sources": [
+    "college"
+   ],
+   "category": "unanswerable",
+   "question": "What is the hostel fee for girls in 2027?",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-07",
+   "sources": [
+    "pdf"
+   ],
+   "category": "unanswerable",
+   "question": "How do I bake a chocolate cake?",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-08",
+   "sources": [
+    "wiki"
+   ],
+   "category": "unanswerable",
+   "question": "What is the current price of Bitcoin?",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-09",
+   "sources": [
+    "video"
+   ],
+   "category": "unanswerable",
+   "question": "Which football club does Tim Urban support?",
+   "evidence": [],
+   "answer_keywords": []
+  },
+  {
+   "id": "none-10",
+   "sources": [
+    "repo"
+   ],
+   "category": "unanswerable",
+   "question": "Does this repo include a React frontend?",
+   "evidence": [],
+   "answer_keywords": []
+  }
+ ]
+}

@@ -1,0 +1,352 @@
+{
+ "pdf-01": {
+  "answer": "SAGE stands for Semantic Analysis and Generation Engine [S2].",
+  "confidence_score": 0.52,
+  "confidence_label": "Medium",
+  "citations": 6,
+  "seconds": 10.23
+ },
+ "pdf-02": {
+  "answer": "They use **ChromaDB** as their vector database [S1].\n\nSpecifically, the system is \"backed by ChromaDB (vector store)\" [S1], which holds the chunk text, embedding vectors, and metadata needed for retrieval [S5]. The retrieval process searches against \"Chroma's HNSW index configured for cosine distance\" [S6].",
+  "confidence_score": 0.56,
+  "confidence_label": "Medium",
+  "citations": 6,
+  "seconds": 2.72
+ },
+ "pdf-03": {
+  "answer": "Source and chunk metadata are stored in two different systems: ChromaDB and Supabase [S2].\n\n*   **ChromaDB** (vector store) holds the chunk text, embedding vector, and a flat metadata dictionary, which is what retrieval needs [S2].\n*   **Supabase** (relational store) holds the relational structure needed by the product but not for retrieval. This includes knowledgebase and source records, titles, URLs, timestamps, and job status for asynchronous source types [S2].",
+  "confidence_score": 0.69,
+  "confidence_label": "High",
+  "citations": 7,
+  "seconds": 2.87
+ },
+ "pdf-04": {
+  "answer": "SAGE prevents one source from dominating the answer slots when combining sources by using a **diversity floor** mechanism [S1]. This mechanism activates specifically when a request explicitly names two or more combined sources [S1].\n\nThe process works as follows:\n1.  **Reservation:** The system reserves at least one citation slot for each combined source before any slots are filled by pure score ranking [S1].\n2.  **Filling Remaining Slots:** After the reserved slots are guaranteed, the remaining slots are filled based on the blended score across all sources [S1].\n3.  **Final Selection:** The combined selection is then re-sorted and truncated to the final limit *k* [S1].\n\nThis approach ensures that each source is represented (preventing \"silent starvation\" of a source with fewer but highly relevant chunks) without guaranteeing proportional representation, which could starve the most on-topic source of capacity [S2]. This mechanism was implemented as a bug fix to address the failure mode where pure score-sorting could push a source's only relevant chunk outside the cutoff [S1], [S4].",
+  "confidence_score": 0.72,
+  "confidence_label": "High",
+  "citations": 7,
+  "seconds": 3.73
+ },
+ "pdf-05": {
+  "answer": "SAGE uses the \"all-MiniLM-L6-v2\" model from Sentence-Transformers for sentence embedding [S3], [S4].",
+  "confidence_score": 0.61,
+  "confidence_label": "High",
+  "citations": 7,
+  "seconds": 2.79
+ },
+ "pdf-06": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.69,
+  "confidence_label": "High",
+  "citations": 7,
+  "seconds": 3.36
+ },
+ "pdf-07": {
+  "answer": "SAGE चार प्रकार के स्रोतों को ingest करता है: क्रॉल की गई वेबसाइटें, PDF दस्तावेज़, YouTube वीडियो ट्रांसक्रिप्ट और GitHub कोड रिपॉजिटरी [S2], [S6]।",
+  "confidence_score": 0.59,
+  "confidence_label": "Medium",
+  "citations": 6,
+  "seconds": 2.9
+ },
+ "pdf-08": {
+  "answer": "This paper introduces SAGE (Semantic Analysis and Generation Engine), a system designed for retrieval-augmented generation (RAG) over diverse knowledge bases [S3], [S5]. Unlike most RAG systems that work with single, homogeneous corpora, SAGE can ingest and answer questions across four different source types: crawled websites, PDF documents, YouTube video transcripts, and GitHub code repositories [S3], [S5].\n\nKey engineering decisions in SAGE include:\n*   **Deterministic source-overview chunks**: SAGE creates a non-generative overview chunk for each source from its statistics and excerpts, making broad questions retrievable without an additional LLM call [S1], [S3], [S5].\n*   **Hybrid semantic-lexical reranking with a diversity floor**: This ensures fair citation representation across multiple sources, addressing a bug where one source's evidence could be starved in multi-source queries [S3], [S6].\n*   **Confidence heuristic**: SAGE uses a confidence score derived from retrieval evidence to gate refusal in a \"Grounded Mode,\" deciding whether to answer or refuse with a clarifying question [S3], [S6].\n\nThe system uses a shared ingest-chunk-embed-index contract and a single retrieval-reranking-generation pipeline [S3], [S4]. SAGE's architecture is a FastAPI backend with a React web client and a Chrome side-panel extension, backed by ChromaDB and Supabase [S4]. The paper also details the SAGE API surface for various operations like QA, ingestion, and job status [S2].",
+  "confidence_score": 0.55,
+  "confidence_label": "Medium",
+  "citations": 6,
+  "seconds": 4.52
+ },
+ "video-01": {
+  "answer": "According to the source, the **Instant Gratification Monkey** is the entity that drives the procrastinator to waste time [S1].\n\nThe source explains that while the Rational Decision-Maker makes the rational choice to be productive, the Instant Gratification Monkey dislikes that plan and takes over, leading the procrastinator to engage in less productive, more immediately gratifying activities [S1]. The Monkey is only deterred by the **Panic Monster**, which appears when deadlines are close or consequences are severe [S2].",
+  "confidence_score": 0.77,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.69
+ },
+ "video-02": {
+  "answer": "The Panic Monster is described as a \"guardian angel\" for procrastinators, who is usually dormant but wakes up when a deadline is too close or there's a risk of public embarrassment, career disaster, or other scary consequences [S2]. It is the only thing that the \"Monkey\" (representing instant gratification) is terrified of [S2]. When the Panic Monster appears, it causes mayhem, and the Monkey flees, allowing the \"Rational Decision-Maker\" to take control and start working [S1]. The Panic Monster is crucial in deadline-based procrastination, as its involvement helps contain the effects of procrastination to the short term [S5]. However, in situations without deadlines, the Panic Monster doesn't show up, which can be a problem for procrastinators [S6].",
+  "confidence_score": 0.83,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 3.35
+ },
+ "video-03": {
+  "answer": "The \"monkey thing\" the speaker talks about is the \"Instant Gratification Monkey\" [S2]. This monkey is a character in the procrastinator's brain, alongside the Rational Decision-Maker [S2].\n\nHere's what the monkey does:\n*   It takes control from the Rational Decision-Maker [S2].\n*   It prefers activities that provide instant gratification, like reading Wikipedia pages, checking the fridge, or going on YouTube spirals, instead of doing productive work [S6].\n*   It lives entirely in the present moment, with no memory of the past or knowledge of the future [S6].\n*   It is only terrified of the \"Panic Monster\" [S1], which appears when deadlines are close or there's a danger of public embarrassment or career disaster [S1]. When the Panic Monster wakes up, the Monkey \"is up the tree,\" allowing the Rational Decision-Maker to take control and start working [S4].",
+  "confidence_score": 0.78,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 3.85
+ },
+ "video-04": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.75,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.52
+ },
+ "video-05": {
+  "answer": "Based on the provided source context, Tim Urban’s advice at the end of the talk centers on the concept of the \"Life Calendar.\"\n\nHe advises the audience to take a \"long, hard look\" at a visual representation of a 90-year life, where each box represents one week [S8]. He notes that there are not that many boxes, especially since many have already been used [S8]. This visualization is intended to help people recognize the limited nature of their time and address the \"long-term kind of procrastination\" that occurs when there are no immediate deadlines, which he describes as the \"Monkey's sneakiest trick\" [S7], [S8].\n\nThe source context cuts off before he explicitly states the final imperative action or conclusion derived from looking at the calendar, but the core advice provided is to confront the finite number of weeks remaining in one's life to combat long-term procrastination and regret [S7], [S8].",
+  "confidence_score": 0.79,
+  "confidence_label": "High",
+  "citations": 8,
+  "seconds": 3.38
+ },
+ "video-06": {
+  "answer": "Tim Urban ke TED Talk ke hisaab se, **Rational Decision-Maker** ka kaam hai ki wo **rational (manturbhast) decisions le** aur **productive kaam** kare. [S1]\n\nJab procrastinator ke dimaag mein kaam karne ka waqt aata hai, toh Rational Decision-Maker decide karta hai ki wo kuch productive kaam kare, lekin aksar \"Instant Gratification Monkey\" us plan ko pasand nahi karta aur usse rok deta hai. [S1]\n\nRational Decision-Maker ka main role hai:\n1.  **Future ko samajhna:** Wo samajhta hai ki future mein kya hone wala hai aur uske liye abhi kaam shuru karna zaroori hai. [S6]\n2.  **Wheel lena (Control lena):** Jab \"Panic Monster\" (deadline ya embarrassment ki wajah se) active ho jata hai, toh Monkey dar jata hai aur peeche hat jata hai. Tabhi Rational Decision-Maker control (wheel) leta hai aur insaan ko kaam shuru karne par majboor karta hai. [S4]\n\nShort mein, wo wo hissa hai jo logic se sochta hai aur aakhir mein kaam karne ke liye majboor karta hai, khaaskar jab panic hota hai. [S4]",
+  "confidence_score": 0.75,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 3.62
+ },
+ "video-07": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.64,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 3.73
+ },
+ "video-08": {
+  "answer": "This video, titled \"Inside the Mind of a Master Procrastinator\" by Tim Urban, is about procrastination [S1]. Tim Urban, a writer and blogger, explains what goes on in the minds of procrastinators and why they behave the way they do [S3]. He hypothesizes that the brains of procrastinators are different from others [S3, S6].\n\nHe describes the procrastinator's brain as having a \"Rational Decision-Maker\" and an \"Instant Gratification Monkey\" [S6]. The \"Panic Monster\" is introduced as a guardian angel for procrastinators, waking up when deadlines are near or there's a risk of public embarrassment, and is the only thing the Monkey is terrified of [S2]. This system, involving these three characters, explains how procrastinators, despite delaying, can miraculously find the work ethic to complete tasks when the Panic Monster takes over [S4].\n\nThe video also touches on a second type of procrastination that occurs when there are no deadlines, which is less visible and talked about than the deadline-based kind [S1].",
+  "confidence_score": 0.78,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 3.65
+ },
+ "repo-01": {
+  "answer": "The `kennethreitz/records` repository contains a Python library called \"Records\" [S2, S5]. This library is designed to simplify making raw SQL queries to most relational databases, including RedShift, Postgres, MySQL, SQLite, Oracle, and MS-SQL [S5]. It allows users to write SQL queries directly and provides an interface to work with the query results [S5].\n\nThe repository also includes:\n*   A `setup.py` file for building and publishing the package to PyPi [S4].\n*   A `ci.yml` workflow that installs Python dependencies, runs tests, and lints with various Python versions [S3].\n*   Examples of how to use the library, such as querying a database and iterating over results [S5].\n*   Command-line interface (CLI) functionality for executing queries with parameters and specifying output formats [S6].",
+  "confidence_score": 0.74,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 8.08
+ },
+ "repo-02": {
+  "answer": "The recommended installation method is using pipenv: `$ pipenv install records[pandas]` [S6].",
+  "confidence_score": 0.78,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 5.71
+ },
+ "repo-03": {
+  "answer": "To export query results to CSV using the `records` library, you can use the `.export('csv')` method on the `RecordCollection` object returned by a query.\n\nWhile the provided source context explicitly demonstrates exporting to Excel (`.xls`) and Pandas DataFrames (`.df`) [S4], it states that \"All other features of Tablib are also available\" [S4]. Since `records` uses `tablib` for exporting, and `tablib` supports CSV, the standard method is:\n\n```python\nimport records\n\ndb = records.Database('postgres://...')\nrows = db.query('select * from active_users')\n\n# Export to CSV\ncsv_data = rows.export('csv')\n\n# Write to file\nwith open('report.csv', 'w') as f:\n    f.write(csv_data)\n```\n\nAlternatively, if you are using the command-line interface, you can specify the format. The source notes that `Records` is intended for report-style exports and supports various formats [S3]. You can use the `--format` flag (or positional argument depending on the CLI version) to specify `csv`. For example:\n\n```bash\nrecords 'select * from active_users' --format csv > report.csv\n```\n\nNote: The specific code snippet for CSV export is not explicitly shown in the provided text, but the mechanism is confirmed by the reference to Tablib's capabilities [S4] and the CLI's support for multiple formats [S3].",
+  "confidence_score": 0.6,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 3.99
+ },
+ "repo-04": {
+  "answer": "Records supports raw SQL queries to most relational databases, including RedShift, Postgres, MySQL, SQLite, Oracle, and MS-SQL [S3].",
+  "confidence_score": 0.74,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 3.07
+ },
+ "repo-05": {
+  "answer": "Records is a library for making raw SQL queries to most relational databases [S2]. It uses `records.Database` to connect to databases [S2], [S5].",
+  "confidence_score": 0.73,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.6
+ },
+ "repo-06": {
+  "answer": "Records library ko database se connect karne ke liye aapko `records.Database` class ka use karna hota hai, jisme aapko database ka connection URL (jaise `postgres://...` ya `sqlite:///users.db`) dena hota hai [S2].\n\nYeh process aise hota hai:\n1.  Pehle `records` library import karein [S2].\n2.  Apne database ke liye sahi connection string (URL) taiyar karein [S2].\n3.  `records.Database()` constructor ko call karein aur usme connection string pass karein [S2].\n\nExample code:\n```python\nimport records\n\n# Postgres ke liye\ndb = records.Database('postgres://...')\n\n# Ya SQLite ke liye\ndb = records.Database('sqlite:///users.db')\n```\n[S2] [S6]\n\nAgar aap connection string explicitly na dein, toh library `DATABASE_URL` environment variable ko check karegi [S4]. Agar na URL diya jaye na environment variable set ho, toh `ValueError` throw hoga [S4].",
+  "confidence_score": 0.65,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.66
+ },
+ "repo-07": {
+  "answer": "Based on the provided source context, query results can be exported to the following formats:\n\n*   **Microsoft Excel** (specifically `xls` and `xlsx`) [S6]\n*   **Pandas DataFrame** (using the format identifier `df`) [S6]\n\nThe documentation notes that because the library utilizes Tablib, \"All other features of Tablib are also available,\" implying that any format supported by Tablib can be used for export [S6]. However, the specific list of all supported formats (`formats_lst`) is referenced in the code but not explicitly enumerated in the provided text snippets [S1].",
+  "confidence_score": 0.68,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.98
+ },
+ "wiki-01": {
+  "answer": "Retrieval-augmented generation (RAG) is a technique that lets large language models (LLMs) look up and use information from external sources at inference time. Instead of relying only on the data the model was trained on, RAG first retrieves relevant documents or passages from a specified set of documents, databases, or the web, and then incorporates that retrieved content into the model’s response. This approach helps keep answers up-to-date, reduces hallucinations, and allows the model to cite sources for greater transparency. [S1]",
+  "confidence_score": 0.81,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.71
+ },
+ "wiki-02": {
+  "answer": "RAG (Retrieval-Augmented Generation) solves several key problems associated with Large Language Models (LLMs):\n\n1.  **Incorrect Information and Hallucinations:** LLMs can provide incorrect information or \"hallucinate\" facts (e.g., describing policies that don't exist or citing nonexistent legal cases) [S2]. RAG helps prevent these errors by grounding responses in retrieved, factually correct external sources [S1][S2].\n2.  **Outdated or Missing Knowledge:** LLMs rely on static training data, which may not include recent updates or domain-specific information [S2]. RAG allows LLMs to access and incorporate new, updated, or domain-specific information from external data sources that were not available during training [S2][S6].\n3.  **High Retraining Costs:** Updating an LLM with new data typically requires expensive retraining. RAG reduces the need for retraining by retrieving relevant information at inference time, saving computational and financial costs [S2].\n4.  **Lack of Transparency and Verifiability:** LLM responses often lack clear sources. RAG allows models to include sources in their responses, enabling users to verify the cited sources and cross-check the retrieved content for accuracy and relevance [S1][S2].\n\n**Note:** While RAG addresses these issues, it does not solve all problems. For instance, LLMs can still generate misinformation if they misinterpret the context of factually correct retrieved sources [S1].",
+  "confidence_score": 0.82,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.38
+ },
+ "wiki-03": {
+  "answer": "**RAG (Retrieval-Augmented Generation)** एक ऐसी तकनीक है जिसमें बड़े भाषा मॉडल (LLM) को किसी प्रश्न का उत्तर देते समय बाहरी दस्तावेज़ों या डेटाबेस से संबंधित जानकारी **खोजने** और **उपयोग करने** की अनुमति दी जाती है।  \n- LLM पहले एक निर्दिष्ट दस्तावेज़ सेट से प्रासंगिक अंश खोजता है।  \n- फिर उन अंशों को अपने स्वयं के प्रशिक्षण डेटा के साथ मिलाकर उत्तर तैयार करता है।  \n\n**क्यों उपयोग करें?**  \n1. **सटीकता बढ़ती है** – बाहरी स्रोतों से तथ्य खींचने से मॉडल “हैलुसिनेशन” (ग़लत जानकारी) कम करता है।  \n2. **नवीनतम जानकारी** – मॉडल के स्थिर प्रशिक्षण डेटा में न होने वाली नई या डोमेन-विशिष्ट जानकारी तक पहुँच संभव होती है।  \n3. **स्रोत पारदर्शिता** – उत्तर में उपयोग किए गए दस्तावेज़ों का उल्लेख किया जा सकता है, जिससे उपयोगकर्ता सत्यापन कर सकते हैं।  \n4. **प्रशिक्षण लागत घटती है** – बार-बार मॉडल को पुनः प्रशिक्षित करने की आवश्यकता नहीं पड़ती, क्योंकि अपडेटेड डेटा केवल खोज के माध्यम से उपलब्ध कराया जाता है।  \n\nइस प्रकार RAG LLM को अधिक विश्वसनीय, अद्यतन और पारदर्शी बनाता है। [S2]",
+  "confidence_score": 0.83,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.66
+ },
+ "wiki-04": {
+  "answer": "The term \"retrieval-augmented generation\" (RAG) was introduced in a 2020 paper [S1]. The specific authors of this foundational paper are Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni, Vladimir Karpukhin, Naman Goyal, Heinrich Küttler, Mike Lewis, Wen-tau Yih, Tim Rocktäschel, Sebastian Riedel, and Douwe Kiela [S3]. The technique itself was first proposed in 2020 [S4].",
+  "confidence_score": 0.72,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.59
+ },
+ "wiki-05": {
+  "answer": "The term RAG was introduced in 2020[S1][S2].",
+  "confidence_score": 0.76,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.53
+ },
+ "wiki-06": {
+  "answer": "**TL;DR:** Retrieval-augmented generation (RAG) is a technique that lets large language models (LLMs) pull in fresh, external information—such as documents, databases, or web content—before answering a query. First proposed in 2020, RAG blends a parametric language model with a non-parametric external memory accessed at inference time, enabling LLMs to use up-to-date or domain-specific data that isn’t in their training set. This reduces hallucinations, cuts the need for costly retraining, and allows models to cite sources for greater transparency. However, RAG does not eliminate all errors; LLMs can still misinterpret or misuse retrieved content. [S1][S6]",
+  "confidence_score": 0.84,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.84
+ },
+ "wiki-07": {
+  "answer": "No, RAG does not completely eliminate hallucinations. While RAG improves the accuracy of large language models (LLMs) and helps reduce AI hallucinations, it does not prevent them entirely [S1][S6].\n\nAccording to the sources:\n*   LLMs can still \"hallucinate around the source material in its response\" [S1].\n*   RAG is not a direct solution to all hallucination issues [S1].\n*   LLMs may generate misinformation even when pulling from factually correct sources if they misinterpret the context [S4].\n*   Models may struggle to recognize when they lack sufficient information and generate answers instead of indicating uncertainty [S1].\n\nTherefore, RAG mitigates but does not completely eliminate hallucinations [S1][S4][S6].",
+  "confidence_score": 0.55,
+  "confidence_label": "Medium",
+  "citations": 6,
+  "seconds": 2.12
+ },
+ "college-01": {
+  "answer": "Admission contact number: +91 774 397 9315[S1][S6]",
+  "confidence_score": 0.82,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.86
+ },
+ "college-02": {
+  "answer": "The college is located in Nagpur, Maharashtra, India – specifically at Vincent Pallotti College of Engineering & Technology, Gavsi Manapur, Wardha Road, Nagpur, Maharashtra 441108[S4].",
+  "confidence_score": 0.76,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.15
+ },
+ "college-03": {
+  "answer": "Based on the provided source context, SVPCET offers the following courses [S1]:\n\n**B.Tech (Engineering, Sciences and Humanities)**\n*   Civil Engineering\n*   Computer Science and Engineering\n*   Electronics & Telecommunication\n*   Electrical Engineering\n*   Information Technology\n*   Mechanical Engineering\n*   Artificial Intelligence\n*   Computer Science & Engineering (Data Science)\n*   Computer Science & Engineering (Cyber Security)\n*   Industrial IOT\n*   Computer Science and Business Systems (TCS)\n*   Robotics and Artificial Intelligence\n\n**M.Tech**\n*   Computer Science Engineering (Big Data Analytics)\n*   Automotive Technology\n*   Power Electronics and Power Systems\n*   Embedded System and VLSI Design\n*   Structural Engineering\n*   Computer Science and Engineering (AI & ML)\n\n**Computer Application Courses**\n*   Bachelor of Computer Application (BCA)\n*   Master of Computer Application (MCA)\n\n**Management Courses**\n*   Bachelor of Business Administration (BBA)\n*   Master of Business Administration (MBA)\n\n**Ph.D.**\n*   Research Center\n\n**Other**\n*   Department of Vocation (B. VOC)\n\n[S1]",
+  "confidence_score": 0.73,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.18
+ },
+ "college-04": {
+  "answer": "कॉलेज का पता है:  \n**St. Vincent Pallotti College of Engineering & Technology, Gavsi Manapur, Wardha Road, Nagpur, Maharashtra, India – PIN 441108**[S2]",
+  "confidence_score": 0.74,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.05
+ },
+ "college-05": {
+  "answer": "The PIN code of the college is **441108**[S2][S3][S4][S5][S6]",
+  "confidence_score": 0.73,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.49
+ },
+ "python-01": {
+  "answer": "Yes, Python is free to use. It is developed under an OSI-approved open source license, which makes it freely usable and distributable, including for commercial use [S1]. The license is administered by the Python Software Foundation [S1].",
+  "confidence_score": 0.66,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.46
+ },
+ "python-02": {
+  "answer": "Python's license is administered by the Python Software Foundation [S1].",
+  "confidence_score": 0.72,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.3
+ },
+ "python-03": {
+  "answer": "The page is the “About Python” section of the official Python.org website. It explains what Python is, why it’s popular, and how it can be started by beginners or experienced programmers. It highlights Python’s strengths (powerful, fast, cross-platform, friendly, open source), provides links to getting-started guides, downloads, documentation, community resources, conferences, and the Python Package Index (PyPI). It also mentions the Python Software Foundation, mailing lists, IRC channels, and the open-source license that governs Python.",
+  "confidence_score": 0.65,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 2.1
+ },
+ "multi-01": {
+  "answer": "**Paper (SAGE Research Paper)**  \n- States that most existing retrieval-augmented generation (RAG) systems are built and evaluated on a *single, homogeneous* text corpus [S3].  \n- Argues that real-world knowledge work involves *heterogeneous* sources (web pages, PDFs, video transcripts, source code) that must be queried together [S4].  \n- Treats the RAG pipeline as an *engineering problem*: integrating extraction, chunking, retrieval and citation across very different source types [S4-S5].  \n- Does **not** propose a new retrieval or generation model; instead it focuses on the system architecture (deterministic overview chunks, citation diversity, confidence gating, etc.) [S5].\n\n**Wikipedia article on Retrieval-augmented generation**  \n- Defines RAG as a technique that lets large language models (LLMs) *retrieve and incorporate* new information from external data sources before generating a response [S1-S2][S6].  \n- Highlights benefits such as using domain-specific or up-to-date information, reducing hallucinations, lowering the need for costly retraining, and providing source citations for transparency [S1-S2][S6].  \n- Notes that the term “retrieval-augmented generation” was introduced in a 2020 paper that combined a parametric language model with a non-parametric external memory [S1-S2][S6].\n\n**Comparison**  \n- Both the paper and the Wikipedia entry describe RAG as a pipeline that couples retrieval with generation.  \n- The Wikipedia article focuses on *what RAG achieves* (access to external knowledge, hallucination reduction, citation, efficiency) and its origin in 2020.  \n- The paper focuses on *limitations of existing RAG implementations* (reliance on a single, uniform corpus) and on the *engineering challenges* of extending RAG to heterogeneous knowledge bases; it does not claim new retrieval or generation models, but rather a system that can handle multiple source types.  \n\nThus, the paper complements the Wikipedia description by pointing out practical shortcomings of current RAG systems and proposing a cross-source engineering solution, whereas Wikipedia provides a high-level overview of the technique and its benefits.",
+  "confidence_score": 0.87,
+  "confidence_label": "High",
+  "citations": 7,
+  "seconds": 4.29
+ },
+ "multi-02": {
+  "answer": "Yes, Records is written in Python, and Python is free to use.\n\n1.  **Records is written in Python:** The repository overview for `kennethreitz/records` lists \"Python\" as one of the detected languages [S7]. Additionally, the README provides code examples using Python syntax (e.g., `import records`) [S4].\n2.  **Python is free to use:** According to Python.org, Python is developed under an OSI-approved open source license, which makes it \"freely usable and distributable, even for commercial use\" [S2] [S3].",
+  "confidence_score": 0.72,
+  "confidence_label": "High",
+  "citations": 7,
+  "seconds": 2.94
+ },
+ "none-01": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.27,
+  "confidence_label": "Low",
+  "citations": 6,
+  "seconds": 1.79
+ },
+ "none-02": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.19,
+  "confidence_label": "Low",
+  "citations": 7,
+  "seconds": 1.38
+ },
+ "none-03": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.7,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.69
+ },
+ "none-04": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.41,
+  "confidence_label": "Medium",
+  "citations": 6,
+  "seconds": 2.03
+ },
+ "none-05": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.74,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.6
+ },
+ "none-06": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.65,
+  "confidence_label": "High",
+  "citations": 7,
+  "seconds": 2.15
+ },
+ "none-07": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.16,
+  "confidence_label": "Low",
+  "citations": 6,
+  "seconds": 2.29
+ },
+ "none-08": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.19,
+  "confidence_label": "Low",
+  "citations": 6,
+  "seconds": 1.75
+ },
+ "none-09": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.3,
+  "confidence_label": "Low",
+  "citations": 6,
+  "seconds": 2.11
+ },
+ "none-10": {
+  "answer": "Not available in the provided source.",
+  "confidence_score": 0.68,
+  "confidence_label": "High",
+  "citations": 6,
+  "seconds": 1.54
+ }
+}

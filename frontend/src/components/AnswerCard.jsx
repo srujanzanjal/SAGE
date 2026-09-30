@@ -63,19 +63,13 @@ function AnswerText({ text, onCite }) {
   });
 }
 
-function getConfidenceBadgeColor(score) {
-  if (score == null) return "bg-slate-50 text-slate-500 border-slate-200";
-  if (score >= 0.7) return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  if (score >= 0.4) return "bg-amber-50 text-amber-700 border-amber-200";
-  return "bg-rose-50 text-rose-700 border-rose-200";
-}
-
-function getConfidenceLabel(score) {
-  if (score == null) return "Unknown";
-  if (score >= 0.7) return "High";
-  if (score >= 0.4) return "Medium";
-  return "Low";
-}
+// Label and colour come from the backend's calibrated confidence_label, so the
+// web app, extension and paper all agree on what "High" means.
+const CONFIDENCE_BADGE = {
+  High: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  Medium: "bg-amber-50 text-amber-700 border-amber-200",
+  Low: "bg-rose-50 text-rose-700 border-rose-200",
+};
 
 export default function AnswerCard({ answer, streaming = false, onAskFollowUp = null }) {
   const [copyMessage, setCopyMessage] = useState(null);
@@ -101,7 +95,7 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
   }
 
   const hasConfidenceScore = typeof answer.confidence_score === "number";
-  const confidenceLabel = getConfidenceLabel(answer.confidence_score);
+  const confidenceLabel = answer.confidence_label || "Unknown";
   const confidencePercent = hasConfidenceScore ? Math.round(answer.confidence_score * 100) : null;
 
   async function copyAnswer() {
@@ -124,7 +118,7 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
               {answer.mode === "grounded" ? "Grounded Response" : "Exploratory Response"}
             </h3>
           </div>
-          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${getConfidenceBadgeColor(answer.confidence_score)}`}>
+          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${CONFIDENCE_BADGE[confidenceLabel] || "bg-slate-50 text-slate-500 border-slate-200"}`}>
             <BadgeCheck size={16} />
             <span>{confidenceLabel} Confidence</span>
             {confidencePercent !== null && <span className="text-xs font-normal">({confidencePercent}%)</span>}
