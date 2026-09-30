@@ -47,18 +47,18 @@ export default function LandingPage({ onSelectType }) {
                   <BrainCircuit size={14} /> SAGE source-grounded AI
                 </div>
                 <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
-                  Ask grounded questions over websites, documents, videos, and GitHub repos.
+                  Turn any source into knowledge you can verify.
                 </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-                  SAGE ingests public knowledge sources, stores citations, and answers with confidence scores, snippets, and source-aware reasoning.
+                  Add a website, PDF, YouTube video, or GitHub repo. SAGE builds a cited brief of it and answers your questions with the exact evidence highlighted.
                 </p>
 
                 <div className="mt-6 flex flex-wrap gap-3 text-sm">
                   {[
-                    "Grounded answers",
-                    "Confidence scores",
-                    "Timestamp citations",
-                    "File-line links",
+                    "Source briefs",
+                    "Highlighted evidence",
+                    "Any language, any phrasing",
+                    "Honest \"not in source\" answers",
                   ].map((item) => (
                     <span key={item} className="rounded-full border border-slate-200 bg-white px-3 py-2 font-medium text-slate-700 shadow-sm">
                       {item}
@@ -71,16 +71,16 @@ export default function LandingPage({ onSelectType }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-200">What SAGE can do</p>
                 <div className="mt-4 space-y-4 text-sm text-slate-300">
                   <div className="rounded-2xl bg-white/5 p-4">
-                    <p className="font-semibold text-white">1. Ingest a source</p>
-                    <p className="mt-1">Website, PDF, video transcript, or GitHub repository.</p>
+                    <p className="font-semibold text-white">1. Add a source</p>
+                    <p className="mt-1">Website, PDF, YouTube video, or GitHub repo.</p>
                   </div>
                   <div className="rounded-2xl bg-white/5 p-4">
-                    <p className="font-semibold text-white">2. Index the content</p>
-                    <p className="mt-1">Chunks are embedded, stored, and retrieved with metadata.</p>
+                    <p className="font-semibold text-white">2. Get an instant brief</p>
+                    <p className="mt-1">Summary, key points, and chapters, outline or architecture, every item cited.</p>
                   </div>
                   <div className="rounded-2xl bg-white/5 p-4">
-                    <p className="font-semibold text-white">3. Ask grounded questions</p>
-                    <p className="mt-1">Answers include citations, snippets, and relevance scoring.</p>
+                    <p className="font-semibold text-white">3. Ask anything, see the proof</p>
+                    <p className="mt-1">Every answer links to the exact timestamp, page or line, with the supporting sentences highlighted.</p>
                   </div>
                 </div>
               </div>
