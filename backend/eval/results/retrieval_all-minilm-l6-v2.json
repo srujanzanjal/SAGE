@@ -1,0 +1,977 @@
+{
+ "model": "all-MiniLM-L6-v2",
+ "configs": {
+  "Dense only": {
+   "rows": [
+    {
+     "id": "pdf-01",
+     "category": "factual",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.0
+    },
+    {
+     "id": "pdf-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "pdf-03",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-04",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "pdf-06",
+     "category": "factual",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.0
+    },
+    {
+     "id": "pdf-07",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "video-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "video-05",
+     "category": "position",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.25
+    },
+    {
+     "id": "video-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.25
+    },
+    {
+     "id": "repo-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "repo-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "wiki-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-03",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.2
+    },
+    {
+     "id": "wiki-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-01",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-03",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.16666666666666666
+    },
+    {
+     "id": "college-04",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.25
+    },
+    {
+     "id": "college-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-01",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "multi-01",
+     "category": "multi",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.0
+    },
+    {
+     "id": "multi-02",
+     "category": "multi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    }
+   ],
+   "ms_per_query": 724.3682561470717
+  },
+  "+ BM25 hybrid rerank": {
+   "rows": [
+    {
+     "id": "pdf-01",
+     "category": "factual",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.0
+    },
+    {
+     "id": "pdf-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-03",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-04",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "pdf-06",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.16666666666666666
+    },
+    {
+     "id": "pdf-07",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "video-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "video-05",
+     "category": "position",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "video-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "repo-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "wiki-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-03",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-01",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-03",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.16666666666666666
+    },
+    {
+     "id": "college-04",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.25
+    },
+    {
+     "id": "college-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-01",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "multi-01",
+     "category": "multi",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.2
+    },
+    {
+     "id": "multi-02",
+     "category": "multi",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 1.0
+    }
+   ],
+   "ms_per_query": 370.44348038237814
+  },
+  "+ Query rewriting": {
+   "rows": [
+    {
+     "id": "pdf-01",
+     "category": "factual",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.0
+    },
+    {
+     "id": "pdf-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-03",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-04",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "pdf-06",
+     "category": "factual",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.0
+    },
+    {
+     "id": "pdf-07",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "video-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.2
+    },
+    {
+     "id": "video-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "video-05",
+     "category": "position",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "repo-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "repo-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "repo-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.2
+    },
+    {
+     "id": "wiki-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "wiki-03",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "wiki-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-01",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-03",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-04",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-01",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "multi-01",
+     "category": "multi",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 1.0
+    },
+    {
+     "id": "multi-02",
+     "category": "multi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    }
+   ],
+   "ms_per_query": 2667.281017147081
+  },
+  "Full (+ overview/position)": {
+   "rows": [
+    {
+     "id": "pdf-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": false,
+     "rr": 0.14285714285714285
+    },
+    {
+     "id": "pdf-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-03",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-04",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "pdf-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "pdf-06",
+     "category": "factual",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 0.0
+    },
+    {
+     "id": "pdf-07",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "video-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.2
+    },
+    {
+     "id": "video-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "video-05",
+     "category": "position",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "video-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "repo-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.3333333333333333
+    },
+    {
+     "id": "repo-03",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-04",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "repo-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-06",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "repo-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.2
+    },
+    {
+     "id": "wiki-01",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-02",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "wiki-03",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    },
+    {
+     "id": "wiki-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "wiki-07",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-01",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-03",
+     "category": "typo",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-04",
+     "category": "hindi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "college-05",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-01",
+     "category": "paraphrase",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "python-02",
+     "category": "factual",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 1.0
+    },
+    {
+     "id": "multi-01",
+     "category": "multi",
+     "context_hit": false,
+     "top_k_hit": false,
+     "rr": 1.0
+    },
+    {
+     "id": "multi-02",
+     "category": "multi",
+     "context_hit": true,
+     "top_k_hit": true,
+     "rr": 0.5
+    }
+   ],
+   "ms_per_query": 435.22880514704894
+  }
+ }
+}
