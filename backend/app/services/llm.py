@@ -274,6 +274,10 @@ class LLMService:
 
     # ---- tasks -----------------------------------------------------------
 
+    def complete(self, messages: list[dict], *, temperature: float, max_tokens: int) -> str:
+        """One-shot completion through the full provider fallback chain."""
+        return self._complete(messages, temperature=temperature, max_tokens=max_tokens)
+
     def rewrite_query(self, question: str, history: list[dict] | None = None, source_titles: list[str] | None = None) -> str:
         prompt = (
             "Rewrite the user question into a clear, standalone retrieval search query in English. "

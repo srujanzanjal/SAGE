@@ -1,5 +1,6 @@
-import { BadgeCheck, Quote, AlertCircle, FileText, Globe2, Copy, Video, GitBranch, Code2, ChevronDown } from "lucide-react";
-import { Fragment, useId, useState } from "react";
+import { BadgeCheck, Quote, AlertCircle, FileText, Globe2, Copy, Video, GitBranch, Code2, ChevronDown, Highlighter, Loader2 } from "lucide-react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { getEvidence } from "../lib/api";
 
 const INLINE_PATTERN = /(\*\*[^*]+\*\*|`[^`]+`|\[S\d+\]|【S\d+】)/g;
 const LIST_ITEM = /^\s*(?:[-*•]|\d+[.)])\s+/;
@@ -63,6 +64,85 @@ function AnswerText({ text, onCite }) {
   });
 }
 
+// The answer sentences that cite this source, i.e. the claims to find evidence for.
+function claimsFor(answerText, citationId) {
+  const cites = new RegExp(`\\b${citationId}\\b`);
+  const sentences = answerText.split(/(?<=[.!?।])\s+|\n+/).filter((s) => cites.test(s));
+  return sentences.length ? sentences : [answerText.slice(0, 600)];
+}
+
+// The cited passage with the sentences that support the answer highlighted.
+function EvidenceView({ citation, answerText, autoOpen }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const markRef = useRef(null);
+
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
+
+  useEffect(() => {
+    if (!open || data || error) return;
+    getEvidence(citation.chunk_id, claimsFor(answerText, citation.citation_id))
+      .then(setData)
+      .catch((err) => setError(err.message));
+  }, [open]);
+
+  useEffect(() => {
+    markRef.current?.scrollIntoView({ block: "nearest" });
+  }, [data]);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-amber-300 hover:bg-amber-50"
+      >
+        <Highlighter size={14} className="text-amber-600" /> Show evidence
+      </button>
+    );
+  }
+
+  const parts = [];
+  if (data) {
+    let cursor = 0;
+    data.highlights.forEach((h, i) => {
+      if (h.start > cursor) parts.push(<Fragment key={`t${i}`}>{data.text.slice(cursor, h.start)}</Fragment>);
+      parts.push(
+        <mark key={`m${i}`} ref={i === 0 ? markRef : null} className="rounded bg-amber-200/80 px-0.5 text-slate-900">
+          {data.text.slice(h.start, h.end)}
+        </mark>
+      );
+      cursor = h.end;
+    });
+    parts.push(<Fragment key="end">{data.text.slice(cursor)}</Fragment>);
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-white p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
+        <Highlighter size={13} /> Evidence in the source
+      </p>
+      {!data && !error && (
+        <p className="flex items-center gap-2 text-sm text-slate-500">
+          <Loader2 size={14} className="animate-spin" /> Finding the supporting sentences...
+        </p>
+      )}
+      {error && <p className="text-sm text-rose-700">{error}</p>}
+      {data && (
+        <>
+          {data.highlights.length === 0 && (
+            <p className="mb-2 text-xs text-slate-500">No single sentence stands out; the whole passage supports the answer.</p>
+          )}
+          <p className="max-h-64 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-slate-600">{parts}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Label and colour come from the backend's calibrated confidence_label, so the
 // web app, extension and paper all agree on what "High" means.
 const CONFIDENCE_BADGE = {
@@ -74,6 +154,7 @@ const CONFIDENCE_BADGE = {
 export default function AnswerCard({ answer, streaming = false, onAskFollowUp = null }) {
   const [copyMessage, setCopyMessage] = useState(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [evidenceFor, setEvidenceFor] = useState(null);
   const uid = useId();
 
   if (!answer) return null;
@@ -84,6 +165,7 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
 
   function jumpToCitation(citationId) {
     setSourcesOpen(true);
+    setEvidenceFor(citationId);
     // Wait for the list to render before scrolling to it.
     setTimeout(() => {
       const el = document.getElementById(`${uid}-${citationId}`);
@@ -287,12 +369,11 @@ export default function AnswerCard({ answer, streaming = false, onAskFollowUp = 
                   </div>
                 )}
 
-                <details className="rounded-xl bg-white p-3 border border-slate-200">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-700">View snippet</summary>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {citation.snippet}
-                  </p>
-                </details>
+                {streaming ? (
+                  <p className="text-sm leading-6 text-slate-700">{citation.snippet}</p>
+                ) : (
+                  <EvidenceView citation={citation} answerText={answer.answer || ""} autoOpen={evidenceFor === citation.citation_id} />
+                )}
               </div>
             ))}
           </div>}

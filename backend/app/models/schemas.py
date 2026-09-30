@@ -173,6 +173,46 @@ class SourceOverviewResponse(BaseModel):
     summary: Optional[str] = None
 
 
+class BriefItem(BaseModel):
+    text: str
+    citation: Optional[Citation] = None
+
+
+class BriefSection(BaseModel):
+    title: str
+    detail: str = ""
+    citation: Optional[Citation] = None
+
+
+class SourceBrief(BaseModel):
+    version: int
+    source_type: str
+    summary: str
+    key_points: list[BriefItem]
+    section_label: str
+    sections: list[BriefSection]
+    questions: list[str]
+    generated_at: str
+
+
+class EvidenceRequest(BaseModel):
+    chunk_id: str = Field(min_length=1, max_length=100)
+    # The answer sentences that cite this chunk.
+    claims: list[str] = Field(default_factory=list, max_length=10)
+
+
+class EvidenceHighlight(BaseModel):
+    start: int
+    end: int
+    score: float
+
+
+class EvidenceResponse(BaseModel):
+    chunk_id: str
+    text: str
+    highlights: list[EvidenceHighlight]
+
+
 class KnowledgebaseDetail(BaseModel):
     knowledgebase_id: str
     name: str

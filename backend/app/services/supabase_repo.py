@@ -81,6 +81,9 @@ class SupabaseRepository:
         result = self.db.table("sources").insert(payload).execute()
         return result.data[0]
 
+    def update_source_meta(self, source_id: str, meta: dict[str, Any]) -> None:
+        self.db.table("sources").update({"meta": meta}).eq("id", source_id).execute()
+
     def get_chunks_count(self, knowledgebase_id: str) -> int:
         result = (
             self.db.table("chunks")

@@ -139,22 +139,26 @@ class VectorStore:
             for doc, meta in zip(result.get("documents") or [], result.get("metadatas") or [])
         ]
 
+    def get_source_chunks(self, source_id: str) -> list[RetrievedChunk]:
+        """All chunks of a source in document order (overview chunk first), no search."""
+        result = self.collection.get(where={"source_id": source_id}, include=["documents", "metadatas"])
+        chunks = [
+            RetrievedChunk(chunk_id=str(meta.get("chunk_id")), text=doc, metadata=dict(meta), distance=1.0, semantic_score=0.0)
+            for doc, meta in zip(result.get("documents") or [], result.get("metadatas") or [])
+        ]
+        return sorted(chunks, key=lambda c: int(c.metadata.get("chunk_index", 0)))
+
+    def get_chunk(self, chunk_id: str) -> Optional[RetrievedChunk]:
+        result = self.collection.get(ids=[chunk_id], include=["documents", "metadatas"])
+        docs, metas = result.get("documents") or [], result.get("metadatas") or []
+        if not docs:
+            return None
+        return RetrievedChunk(chunk_id=chunk_id, text=docs[0], metadata=dict(metas[0]), distance=1.0, semantic_score=0.0)
+
     def get_edge_chunks(self, source_id: str, *, from_end: bool, count: int = 2) -> list[RetrievedChunk]:
         """First or last content chunks of a source by position (overview excluded)."""
-        result = self.collection.get(where={"source_id": source_id}, include=["documents", "metadatas"])
-        rows = sorted(
-            (
-                (meta, doc)
-                for doc, meta in zip(result.get("documents") or [], result.get("metadatas") or [])
-                if meta.get("chunk_kind") != "source_overview"
-            ),
-            key=lambda row: int(row[0].get("chunk_index", 0)),
-        )
-        picked = rows[-count:] if from_end else rows[:count]
-        return [
-            RetrievedChunk(chunk_id=str(meta.get("chunk_id")), text=doc, metadata=dict(meta), distance=1.0, semantic_score=0.0)
-            for meta, doc in picked
-        ]
+        content = [c for c in self.get_source_chunks(source_id) if c.metadata.get("chunk_kind") != "source_overview"]
+        return content[-count:] if from_end else content[:count]
 
     def delete_by_source(self, source_id: str) -> None:
         self.collection.delete(where={"source_id": source_id})

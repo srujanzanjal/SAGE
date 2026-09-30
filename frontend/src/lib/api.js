@@ -111,8 +111,16 @@ export async function listSourcesGrouped() {
   return requestJson(`${API_BASE}/sources/grouped`);
 }
 
-export async function getSourceSummary(sourceId) {
-  return requestJson(`${API_BASE}/sources/${sourceId}/summary`);
+export async function getSourceBrief(sourceId, refresh = false) {
+  return requestJson(`${API_BASE}/sources/${sourceId}/brief${refresh ? "?refresh=true" : ""}`);
+}
+
+export async function getEvidence(chunkId, claims) {
+  return requestJson(`${API_BASE}/qa/evidence`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chunk_id: chunkId, claims: claims.slice(0, 10) }),
+  });
 }
 
 export async function getSourceDetails(sourceId) {
