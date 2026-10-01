@@ -23,6 +23,10 @@ const state = {
   tabType: "unsupported",
   tabUrl: "",
   videoFallbackUrl: null,
+  briefs: {}, // sourceId -> { loading } | { data } | { error }
+  evidence: {}, // "chunkId|question" -> evidence response | { error }
+  syncedTabKey: null,
+  showIngestForm: false,
 };
 
 let activeStreamController = null;
@@ -60,6 +64,64 @@ function detectTabType(tab) {
   return "website";
 }
 
+function youtubeId(url) {
+  const match = /(?:[?&]v=|youtu\.be\/)([\w-]{11})/.exec(url || "");
+  return match ? match[1] : null;
+}
+
+function githubRepo(url) {
+  const match = /github\.com\/([^\/]+\/[^\/?#]+)/i.exec(url || "");
+  return match ? match[1].replace(/\.git$/, "").toLowerCase() : null;
+}
+
+function pageKey(url) {
+  try {
+    const u = new URL(url);
+    return `${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}`.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+// What the current tab "is", ignoring things like a video's &t= position.
+function tabKey(type, url) {
+  if (type === "video") return youtubeId(url);
+  if (type === "github") return githubRepo(url);
+  if (type === "website") return pageKey(url);
+  return null;
+}
+
+// The already-ingested source for the current tab, if there is one.
+function sourceForTab(type = state.tabType, url = state.tabUrl, sources = state.sources) {
+  const key = tabKey(type, url);
+  if (!key) return null;
+  return (
+    sources.find((s) => {
+      if (s.source_type !== type) return false;
+      if (type === "video") return s.video_id === key || youtubeId(s.canonical_ref) === key;
+      if (type === "github") return githubRepo(s.canonical_ref) === key;
+      return pageKey(s.canonical_ref) === key;
+    }) || null
+  );
+}
+
+function updateIngestVisibility() {
+  const alreadyIn = Boolean(sourceForTab()) && !state.showIngestForm;
+  $("already-ingested").classList.toggle("hidden", !alreadyIn);
+  if (TAB_TYPE_META[state.tabType]) $("ingest-form").classList.toggle("hidden", alreadyIn);
+}
+
+// Select the current tab's source when you land on a page SAGE already knows.
+function syncTabSource() {
+  const key = tabKey(state.tabType, state.tabUrl);
+  const match = sourceForTab();
+  const tabChanged = key !== state.syncedTabKey;
+  if (tabChanged) state.showIngestForm = false;
+  if (match && (tabChanged || !state.selectedSourceIds.length)) state.selectedSourceIds = [match.source_id];
+  state.syncedTabKey = key;
+  updateIngestVisibility();
+}
+
 function unsupportedMessage(type) {
   return {
     pdf: "PDF sources aren't supported from the extension yet. Use the main SAGE app to upload a PDF.",
@@ -90,6 +152,7 @@ function applyTabType(type, url) {
     $("unsupported-notice").classList.remove("hidden");
     $("unsupported-notice").querySelector("p").textContent = unsupportedMessage(type);
     $("sources-title").textContent = "All Sources";
+    syncTabSource();
     renderSourceCards();
     return;
   }
@@ -107,6 +170,7 @@ function applyTabType(type, url) {
   if (url && $("source-url").value.trim() !== url) {
     $("source-url").value = url;
   }
+  syncTabSource();
   renderSourceCards();
 }
 
@@ -221,6 +285,7 @@ function updateSelectedSourcesSummary() {
     el.textContent = `Combining ${selected.length} sources for this question.`;
   }
   $("ask-button").disabled = selected.length === 0;
+  renderBrief();
 }
 
 function visibleSources() {
@@ -263,10 +328,10 @@ function renderSourceCards() {
     title.textContent = source.title || source.original_ref || "Source";
     const meta = document.createElement("div");
     meta.className = "source-meta";
-    meta.textContent = [source.status, source.canonical_ref].filter(Boolean).join(" · ");
+    meta.textContent = source.canonical_ref || "";
     const tags = document.createElement("div");
     tags.className = "source-tags";
-    for (const label of [source.source_type, `${source.chunks_count ?? 0} chunks`, source.crawled_pages ? `${source.crawled_pages} pages` : null].filter(Boolean)) {
+    for (const label of [source.source_type, source.crawled_pages ? `${source.crawled_pages} pages` : null].filter(Boolean)) {
       const tag = document.createElement("span");
       tag.className = "tag";
       tag.textContent = label;
@@ -283,6 +348,7 @@ async function loadSources() {
   try {
     const payload = await requestJson("/sources");
     state.sources = Array.isArray(payload) ? payload.filter((s) => s.status === "ready") : [];
+    syncTabSource();
     renderSourceCards();
   } catch (error) {
     setIngestStatus(error.message || "Failed to load sources.", "error");
@@ -510,6 +576,217 @@ function appendFormattedText(container, text) {
   });
 }
 
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+// --- Citations: where they point, and opening them ---
+
+function citationLocator(c) {
+  if (!c) return null;
+  if (c.source_type === "video" && c.video_id && c.start_time != null) {
+    const seconds = Math.max(0, Math.floor(Number(c.start_time)));
+    return { label: c.timestamp_label || "Timestamp", href: `https://www.youtube.com/watch?v=${c.video_id}&t=${seconds}s` };
+  }
+  if (c.source_type === "github" && c.file_path && !c.file_path.startsWith("__SAGE_")) {
+    const lines = c.start_line != null ? `:${c.start_line}-${c.end_line}` : "";
+    return { label: `${c.file_path.split("/").pop()}${lines}`, href: c.file_url || null };
+  }
+  if (c.source_type === "pdf" && c.page_number) return { label: `Page ${c.page_number}`, href: null };
+  if (c.source_type === "website" && /^https?:\/\//.test(c.source_ref || "")) {
+    return { label: c.source_title || c.source_ref, href: c.source_ref };
+  }
+  return { label: "Overview", href: null };
+}
+
+async function openLocator(citation) {
+  const loc = citationLocator(citation);
+  if (!loc?.href) return;
+  // A video already open in the current tab jumps to that moment instead of opening a copy.
+  if (citation.source_type === "video" && youtubeId(state.tabUrl) === citation.video_id) {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id != null) {
+      await chrome.tabs.update(tab.id, { url: loc.href });
+      return;
+    }
+  }
+  await chrome.tabs.create({ url: loc.href });
+}
+
+function locatorChip(citation) {
+  const loc = citationLocator(citation);
+  if (!loc) return null;
+  const chip = el(loc.href ? "button" : "span", "locator-chip", loc.label);
+  if (loc.href) {
+    chip.type = "button";
+    chip.title = "Open in source";
+    chip.addEventListener("click", () => openLocator(citation).catch((error) => setQaStatus(error.message, "error")));
+  }
+  return chip;
+}
+
+// --- Source Brief (shown for a single selected source) ---
+
+function briefSourceId() {
+  return state.selectedSourceIds.length === 1 ? state.selectedSourceIds[0] : null;
+}
+
+async function loadBrief(sourceId) {
+  state.briefs[sourceId] = { loading: true };
+  renderBrief();
+  try {
+    // The first build reads the whole source, so allow it longer than a normal request.
+    state.briefs[sourceId] = { data: await requestJson(`/sources/${sourceId}/brief`, {}, 60000) };
+  } catch (error) {
+    state.briefs[sourceId] = { error: error.message || "Brief unavailable." };
+  }
+  renderBrief();
+}
+
+function briefRow(title, detail, citation) {
+  const row = el("div", "brief-row");
+  const text = el("div", "brief-row-text");
+  if (title) text.append(el("div", "brief-row-title", title));
+  if (detail) text.append(el("div", null, detail));
+  row.append(text);
+  const chip = locatorChip(citation);
+  if (chip) row.append(chip);
+  return row;
+}
+
+function briefGroup(label, rows, open) {
+  const group = el("details", "brief-group");
+  group.open = open;
+  group.append(el("summary", null, `${label} (${rows.length})`), ...rows);
+  return group;
+}
+
+function renderStarters() {
+  const box = $("starter-questions");
+  const sourceId = briefSourceId();
+  const questions = (!state.messages.length && sourceId && state.briefs[sourceId]?.data?.questions) || [];
+  box.replaceChildren(
+    ...questions.map((question) => {
+      const chip = el("button", "followup-chip", question);
+      chip.type = "button";
+      chip.addEventListener("click", () => askQuestion(question).catch((error) => setQaStatus(error.message, "error")));
+      return chip;
+    })
+  );
+  box.classList.toggle("hidden", !questions.length);
+}
+
+function renderBrief() {
+  const sourceId = briefSourceId();
+  $("brief-panel").classList.toggle("hidden", !sourceId);
+  renderStarters();
+  if (!sourceId) return;
+  const entry = state.briefs[sourceId];
+  if (!entry) {
+    loadBrief(sourceId);
+    return;
+  }
+  const body = $("brief-body");
+  body.replaceChildren();
+  if (entry.loading) {
+    body.append(el("p", "brief-note", "Reading the source and building its brief (first time only)..."));
+    return;
+  }
+  if (entry.error) {
+    const retry = el("button", "link-button", "Retry");
+    retry.type = "button";
+    retry.addEventListener("click", () => loadBrief(sourceId));
+    body.append(el("p", "brief-note", `Brief unavailable: ${entry.error} `), retry);
+    return;
+  }
+  const brief = entry.data;
+  body.append(el("p", "brief-summary", brief.summary));
+  if (brief.key_points?.length) {
+    body.append(briefGroup("Key points", brief.key_points.map((k) => briefRow(null, k.text, k.citation)), true));
+  }
+  if (brief.sections?.length) {
+    body.append(briefGroup(brief.section_label, brief.sections.map((x) => briefRow(x.title, x.detail, x.citation)), false));
+  }
+}
+
+// --- Evidence: the cited passage with the supporting sentences highlighted ---
+
+// The answer sentences that cite this source, i.e. the claims to find evidence for.
+function claimsFor(answerText, citationId) {
+  const cites = new RegExp(`\\b${citationId}\\b`);
+  const sentences = answerText.split(/(?<=[.!?।])\s+|\n+/).filter((sentence) => cites.test(sentence));
+  return sentences.length ? sentences : [answerText.slice(0, 600)];
+}
+
+// Split a passage into plain and highlighted runs.
+function highlightParts(text, highlights) {
+  const parts = [];
+  let cursor = 0;
+  for (const h of [...highlights].sort((a, b) => a.start - b.start)) {
+    if (h.start < cursor) continue;
+    if (h.start > cursor) parts.push({ text: text.slice(cursor, h.start), mark: false });
+    parts.push({ text: text.slice(h.start, h.end), mark: true });
+    cursor = h.end;
+  }
+  if (cursor < text.length) parts.push({ text: text.slice(cursor), mark: false });
+  return parts;
+}
+
+function evidenceKey(msg, citation) {
+  return `${citation.chunk_id}|${msg.question}`;
+}
+
+async function toggleEvidence(msg, citation) {
+  msg.openEvidence = msg.openEvidence === citation.citation_id ? null : citation.citation_id;
+  renderChatThread(true);
+  const key = evidenceKey(msg, citation);
+  if (!msg.openEvidence || state.evidence[key]) return;
+  try {
+    state.evidence[key] = await requestJson("/qa/evidence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chunk_id: citation.chunk_id, claims: claimsFor(msg.answer.text, citation.citation_id).slice(0, 10) }),
+    });
+  } catch (error) {
+    state.evidence[key] = { error: error.message };
+  }
+  renderChatThread(true);
+}
+
+function renderEvidence(msg, citation) {
+  const box = el("div", "evidence-box");
+  const head = el("div", "evidence-head");
+  head.append(el("span", null, `Evidence for ${citation.citation_id}`));
+  const chip = locatorChip(citation);
+  if (chip) head.append(chip);
+  box.append(head);
+
+  const data = state.evidence[evidenceKey(msg, citation)];
+  if (!data) {
+    box.append(el("p", "brief-note", "Finding the supporting sentences..."));
+  } else if (data.error) {
+    box.append(el("p", "brief-note", data.error));
+  } else {
+    if (!data.highlights.length) {
+      box.append(el("p", "brief-note", "No single sentence stands out; the whole passage supports the answer."));
+    }
+    const passage = el("p", "evidence-text");
+    for (const part of highlightParts(data.text, data.highlights)) {
+      passage.append(part.mark ? el("mark", null, part.text) : document.createTextNode(part.text));
+    }
+    box.append(passage);
+    // Bring the first highlighted sentence into view once the passage is on the page.
+    requestAnimationFrame(() => {
+      const mark = passage.querySelector("mark");
+      if (mark) passage.scrollTop = mark.offsetTop - 8;
+    });
+  }
+  return box;
+}
+
 function confidenceClass(label) {
   const l = (label || "").toLowerCase();
   if (l === "high") return "high";
@@ -518,9 +795,11 @@ function confidenceClass(label) {
   return "";
 }
 
-function renderChatThread() {
+function renderChatThread(keepScroll = false) {
   const container = $("chat-thread");
   const newChatBtn = $("new-chat");
+  const previousScroll = container.scrollTop;
+  renderStarters();
   if (!state.messages.length) {
     container.classList.add("hidden");
     newChatBtn.classList.add("hidden");
@@ -544,13 +823,7 @@ function renderChatThread() {
 
     const header = document.createElement("div");
     header.className = "chat-turn-answer-header";
-    const label = document.createElement("span");
-    label.style.fontSize = "11px";
-    label.style.fontWeight = "700";
-    label.style.color = "#334155";
-    label.style.textTransform = "uppercase";
-    label.style.letterSpacing = "0.06em";
-    label.textContent = "SAGE Answer";
+    const label = el("span", "answer-label", "SAGE Answer");
     header.append(label);
     if (msg.answer.confidence_label) {
       const badge = document.createElement("span");
@@ -578,18 +851,23 @@ function renderChatThread() {
       answerBox.append(w);
     }
 
-    if (msg.answer.citations?.length) {
-      const list = document.createElement("div");
-      list.className = "citation-list";
+    // A "not in the source" reply cites nothing, so its retrieved chunks would only confuse.
+    const notAvailable = /^not available in the provided source/i.test((msg.answer.text || "").trim());
+    if (msg.answer.citations?.length && !notAvailable) {
+      const list = el("div", "citation-list");
       for (const citation of msg.answer.citations) {
-        const chip = document.createElement("div");
-        chip.className = "citation-chip";
-        const strong = document.createElement("b");
-        strong.textContent = `${citation.citation_id} `;
-        chip.append(strong, document.createTextNode(citation.source_title || citation.source_ref || "Source"));
+        const open = msg.openEvidence === citation.citation_id;
+        const chip = el("button", `citation-chip${open ? " active" : ""}`);
+        chip.type = "button";
+        chip.disabled = msg.streaming;
+        chip.title = "Show the evidence in the source";
+        chip.append(el("b", null, `${citation.citation_id} `), document.createTextNode(citationLocator(citation).label));
+        chip.addEventListener("click", () => toggleEvidence(msg, citation));
         list.append(chip);
       }
       answerBox.append(list);
+      const opened = msg.answer.citations.find((c) => c.citation_id === msg.openEvidence);
+      if (opened && !msg.streaming) answerBox.append(renderEvidence(msg, opened));
     }
 
     if (!msg.streaming && msg.answer.follow_up_question && idx === state.messages.length - 1) {
@@ -609,7 +887,9 @@ function renderChatThread() {
   // Anchor the scroll at the top of the newest question rather than snapping to
   // the very bottom -- for a long answer, scrolling to scrollHeight shows its
   // tail end first, forcing the user to scroll back up just to read from the top.
-  if (lastQuestionBubble) {
+  if (keepScroll) {
+    container.scrollTop = previousScroll;
+  } else if (lastQuestionBubble) {
     container.scrollTop = lastQuestionBubble.offsetTop;
   }
 }
@@ -704,6 +984,10 @@ function wireEventListeners() {
     try { await handleVideoAutoTranscribe(); } catch (error) { setIngestStatus(error.message, "error"); }
   });
   $("refresh-sources").addEventListener("click", loadSources);
+  $("show-ingest").addEventListener("click", () => {
+    state.showIngestForm = true;
+    updateIngestVisibility();
+  });
   $("new-chat").addEventListener("click", startNewChat);
   $("ask-button").addEventListener("click", async () => {
     try { await askQuestion(); } catch (error) { setQaStatus(error.message, "error"); }

@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SAGE Website Panel</title>
+    <title>SAGE</title>
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="hero">
         <button id="settings-toggle" class="icon-button" type="button" title="Settings" aria-label="Settings">⚙</button>
-        <div class="eyebrow">SAGE Extension</div>
-        <h1>Side Panel</h1>
-        <p>Reads your current tab and analyzes it as a website, YouTube video, or GitHub repository.</p>
+        <div class="eyebrow">Chrome extension</div>
+        <h1>SAGE</h1>
+        <p>Turns the page you're on into knowledge you can verify.</p>
         <div id="tab-detected" class="tab-detected"></div>
       </header>
 
@@ -61,6 +61,11 @@
           </div>
         </div>
 
+        <div id="already-ingested" class="already-ingested hidden">
+          <span>This page is already in SAGE.</span>
+          <button id="show-ingest" class="link-button" type="button">Add a different URL</button>
+        </div>
+
         <div id="unsupported-notice" class="unsupported-notice hidden">
           <p>This page type isn't supported for ingestion yet. Open the main SAGE app for PDFs and other sources.</p>
         </div>
@@ -83,6 +88,16 @@
         <div id="sources-list" class="sources-list"></div>
       </section>
 
+      <section id="brief-panel" class="panel brief-panel hidden">
+        <div class="panel-header">
+          <div>
+            <h2>Source brief</h2>
+            <p>What this source says, with links to where it says it.</p>
+          </div>
+        </div>
+        <div id="brief-body"></div>
+      </section>
+
       <section class="panel qa-panel">
         <div class="panel-header">
           <div>
@@ -94,18 +109,15 @@
 
         <div id="chat-thread" class="chat-thread hidden"></div>
 
-        <label class="field">
-          <span>Question</span>
-          <textarea id="question" rows="3" placeholder="Ask something about the selected source(s)..."></textarea>
-        </label>
-        <label class="field">
-          <span>Mode</span>
-          <select id="qa-mode">
+        <div id="starter-questions" class="starter-questions hidden"></div>
+        <textarea id="question" rows="3" aria-label="Question" placeholder="Ask something about the selected source(s)..."></textarea>
+        <div class="ask-row">
+          <select id="qa-mode" aria-label="Answer mode" title="Grounded: only from the source. Exploratory: adds general explanation.">
             <option value="grounded">Grounded</option>
             <option value="exploratory">Exploratory</option>
           </select>
-        </label>
-        <button id="ask-button" class="button primary">Ask question</button>
+          <button id="ask-button" class="button primary">Ask</button>
+        </div>
         <p id="qa-status" class="qa-status"></p>
       </section>
     </main>
