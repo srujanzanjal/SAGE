@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SAGE Side Panel",
-  "description": "Reads your current tab and analyzes it with the local SAGE backend as a website, YouTube video, or GitHub repository.",
-  "version": "1.7.0",
+  "description": "Turns your current tab into a cited brief and answers with highlighted evidence, via the local SAGE backend.",
+  "version": "1.8.0",
   "minimum_chrome_version": "114",
   "action": {
     "default_title": "Open SAGE Side Panel"
