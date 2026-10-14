@@ -11,24 +11,6 @@ from app.services.job_tracker import create_job, get_job, update_job
 from app.services.retrieval_types import RetrievedChunk
 
 
-class FakeVectorStore:
-    def get_overview_chunks(self, source_ids):
-        return []
-
-    def get_edge_chunks(self, source_id, from_end, count=2):
-        return []
-
-    def __init__(self):
-        self.deleted_sources: list[str] = []
-        self.deleted_kbs: list[str] = []
-
-    def delete_by_source(self, source_id: str) -> None:
-        self.deleted_sources.append(source_id)
-
-    def delete_by_knowledgebase(self, knowledgebase_id: str) -> None:
-        self.deleted_kbs.append(knowledgebase_id)
-
-
 class FakeRepo:
     def __init__(self):
         self.sources = {
@@ -144,14 +126,13 @@ def test_job_tracker_lifecycle():
 
 def test_delete_source_cleans_vectors_and_metadata(monkeypatch):
     fake_repo = FakeRepo()
-    fake_vectors = FakeVectorStore()
     monkeypatch.setattr(source_management, "SupabaseRepository", lambda: fake_repo)
-    monkeypatch.setattr(source_management, "get_vector_store", lambda: fake_vectors)
 
     result = source_management.delete_source("src_1")
 
+    # Chunks (incl. embeddings) and the source row both live in Supabase now, so
+    # deleting the chunk rows is the vector cleanup.
     assert result["deleted"] is True
-    assert "src_1" in fake_vectors.deleted_sources
     assert "chunks:src_1" in fake_repo.deleted_sources
     assert "src_1" in fake_repo.deleted_sources
 

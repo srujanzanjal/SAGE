@@ -2,17 +2,29 @@ from app.services.chunker import TextChunk
 from app.services.vector_store import VectorStore
 
 
-class _FakeCollection:
+class _FakeTable:
     def __init__(self):
-        self.payload = None
+        self.rows = None
 
-    def upsert(self, **kwargs):
-        self.payload = kwargs
+    def upsert(self, rows, **kwargs):
+        self.rows = rows
+        return self
+
+    def execute(self):
+        return self
+
+
+class _FakeDB:
+    def __init__(self):
+        self.table_obj = _FakeTable()
+
+    def table(self, _name):
+        return self.table_obj
 
 
 class _TestVectorStore(VectorStore):
     def __init__(self):
-        self.collection = _FakeCollection()
+        self.db = _FakeDB()
 
 
 def test_upsert_chunks_drops_none_metadata_values():
@@ -45,8 +57,11 @@ def test_upsert_chunks_drops_none_metadata_values():
         chunk_ids=["chunk_1"],
     )
 
-    metadata = store.collection.payload["metadatas"][0]
+    row = store.db.table_obj.rows[0]
+    metadata = row["metadata"]
     assert "branch" not in metadata
     assert "nullable_field" not in metadata
     assert metadata["repo_owner"] == "octocat"
     assert metadata["file_path"] == "src/app.py"
+    # Embedding is serialised as a pgvector text literal.
+    assert row["embedding"] == "[0.1,0.2,0.3]"

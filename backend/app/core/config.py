@@ -27,10 +27,9 @@ class Settings(BaseSettings):
     gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
     gemini_fast_model: str = Field(default="gemini-2.5-flash-lite", alias="GEMINI_FAST_MODEL")
     embedding_model_name: str = Field(default="all-MiniLM-L6-v2", alias="EMBEDDING_MODEL_NAME")
-
-    # Local Chroma persistence.
-    chroma_persist_dir: str = Field(default="./chroma_data", alias="CHROMA_PERSIST_DIR")
-    chroma_collection_name: str = Field(default="sage_chunks", alias="CHROMA_COLLECTION_NAME")
+    # Eval only: when set, retrieval reads this model's vectors from
+    # eval_chunk_embeddings instead of the production chunks.embedding column.
+    eval_embedding_model: Optional[str] = Field(default=None, alias="EVAL_EMBEDDING_MODEL")
 
     # Data limits and retrieval tuning.
     max_upload_mb: int = Field(default=25, alias="MAX_UPLOAD_MB")

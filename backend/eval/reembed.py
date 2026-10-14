@@ -1,8 +1,9 @@
-"""Re-embed every stored chunk with another embedding model into its own Chroma
-collection (sage_chunks_<model-slug>), without re-crawling anything.
+"""Re-embed every stored chunk with another embedding model into the eval-only
+table eval_chunk_embeddings (one row per chunk per model), without re-crawling.
 
-Chunk text and metadata come from the Supabase `chunks` table, so the original
-collection is untouched and the app keeps working while models are compared.
+Chunk text and metadata come from the Supabase `chunks` table, so production
+embeddings (chunks.embedding) stay untouched and the app keeps working while
+models are compared.
 
 Usage (from backend/):
     python -m eval.reembed BAAI/bge-small-en-v1.5
@@ -12,66 +13,42 @@ from __future__ import annotations
 import os
 import sys
 import time
-from collections import defaultdict
-
-from eval.run_eval import model_slug
 
 PAGE_SIZE = 1000  # Supabase caps a select at 1000 rows
 
 
+def _to_vector_literal(embedding) -> str:
+    return "[" + ",".join(repr(float(x)) for x in embedding) + "]"
+
+
 def main(model: str) -> None:
-    # Must be set before app settings are first read.
+    # Must be set before app settings/embedder are first read.
     os.environ["EMBEDDING_MODEL_NAME"] = model
-    os.environ["CHROMA_COLLECTION_NAME"] = f"sage_chunks_{model_slug(model)}"
 
     from app.core.supabase_client import get_supabase_client
-    from app.services.chunker import TextChunk
     from app.services.embeddings import get_embedding_service
-    from app.services.vector_store import get_vector_store
 
     db = get_supabase_client()
     rows, start = [], 0
     while True:
-        page = db.table("chunks").select("*").order("id").range(start, start + PAGE_SIZE - 1).execute().data or []
+        page = db.table("chunks").select("id,text").order("id").range(start, start + PAGE_SIZE - 1).execute().data or []
         rows += page
         if len(page) < PAGE_SIZE:
             break
         start += PAGE_SIZE
 
-    by_source: dict[str, list[dict]] = defaultdict(list)
-    for row in rows:
-        by_source[row["source_id"]].append(row)
-
-    embedder, store = get_embedding_service(), get_vector_store()
+    embedder = get_embedding_service()
     started = time.perf_counter()
-    for source_id, source_rows in by_source.items():
-        source_rows.sort(key=lambda r: r["chunk_index"])
-        chunks = [
-            TextChunk(
-                index=r["chunk_index"],
-                text=r["text"],
-                token_estimate=r["token_estimate"],
-                page_number=r.get("page_number"),
-                section_title=r.get("section_title"),
-                extra_metadata=r.get("metadata") or {},
-            )
-            for r in source_rows
-        ]
-        first = source_rows[0]
-        store.upsert_chunks(
-            knowledgebase_id=first["knowledgebase_id"],
-            source_id=source_id,
-            source_type=(first.get("metadata") or {}).get("source_type", "website"),
-            source_ref=first["source_ref"],
-            chunks=chunks,
-            embeddings=embedder.embed_documents([c.text for c in chunks]),
-            chunk_ids=[r["id"] for r in source_rows],
-        )
-    print(f"{model}: {len(rows)} chunks from {len(by_source)} sources re-embedded "
-          f"into {os.environ['CHROMA_COLLECTION_NAME']} in {time.perf_counter() - started:.0f}s")
+    vectors = embedder.embed_documents([r["text"] for r in rows])
+    eval_rows = [{"chunk_id": r["id"], "model": model, "embedding": _to_vector_literal(v)} for r, v in zip(rows, vectors)]
+    for i in range(0, len(eval_rows), 100):
+        db.table("eval_chunk_embeddings").upsert(eval_rows[i : i + 100], on_conflict="chunk_id,model").execute()
+    print(f"{model}: {len(rows)} chunks re-embedded into eval_chunk_embeddings "
+          f"in {time.perf_counter() - started:.0f}s")
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit(__doc__)
+        print(__doc__)
+        sys.exit(1)
     main(sys.argv[1])

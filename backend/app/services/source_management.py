@@ -5,7 +5,6 @@ from typing import Any, Optional
 from app.models.schemas import KnowledgebaseDetail, KnowledgebaseGroup, RecrawlRequest, SourceDetail, SourceSummary, WebsiteCrawlResponse
 from app.services.ingestion_pipeline import crawl_website_ingest
 from app.services.supabase_repo import SupabaseRepository
-from app.services.vector_store import get_vector_store
 
 
 def _source_summary_from_row(row: dict[str, Any]) -> SourceSummary:
@@ -134,16 +133,11 @@ def delete_source(source_id: str) -> dict[str, Any]:
     kb_id = source_row["knowledgebase_id"]
     warnings: list[str] = []
 
-    # Supabase rows are deleted first so metadata/history is consistently removed.
-    # Chroma cleanup is best-effort because ChromaDB and Supabase cannot share one transaction.
+    # Chunks (text, metadata and embeddings) all live in Supabase now, so deleting
+    # the chunk rows removes the vectors too -- no separate vector store to clean up.
     repo.delete_query_history_for_source(source_id)
     repo.delete_source_chunks(source_id)
     deleted_rows = repo.delete_source(source_id)
-
-    try:
-        get_vector_store().delete_by_source(source_id)
-    except Exception as exc:
-        warnings.append(f"Source metadata was deleted, but vector cleanup failed: {exc}")
 
     remaining_sources = repo.list_sources_for_knowledgebase(kb_id)
     if remaining_sources:
@@ -155,7 +149,7 @@ def delete_source(source_id: str) -> dict[str, Any]:
         "knowledgebase_id": kb_id,
         "rows_deleted": len(deleted_rows),
         "warnings": warnings,
-        "message": "Source deleted. Vector cleanup is best-effort if ChromaDB is unavailable.",
+        "message": "Source deleted.",
     }
 
 
@@ -173,18 +167,13 @@ def delete_knowledgebase(knowledgebase_id: str) -> dict[str, Any]:
     repo.delete_knowledgebase_chunks(knowledgebase_id)
     deleted_rows = repo.delete_knowledgebase(knowledgebase_id)
 
-    try:
-        get_vector_store().delete_by_knowledgebase(knowledgebase_id)
-    except Exception as exc:
-        warnings.append(f"Knowledgebase metadata was deleted, but vector cleanup failed: {exc}")
-
     return {
         "deleted": True,
         "knowledgebase_id": knowledgebase_id,
         "source_count": len(source_rows),
         "rows_deleted": len(deleted_rows),
         "warnings": warnings,
-        "message": "Knowledgebase deleted. Vector cleanup is best-effort if ChromaDB is unavailable.",
+        "message": "Knowledgebase deleted.",
     }
 
 

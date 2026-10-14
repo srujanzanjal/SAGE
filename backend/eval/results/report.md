@@ -18,7 +18,7 @@ Eval set: 50 questions over 6 sources (10 unanswerable).
 | Model | Context recall | Recall@k | MRR | ms/query |
 |---|---|---|---|---|
 | all-MiniLM-L6-v2 | 94% | 91% | 0.75 | 435 |
-| BAAI/bge-small-en-v1.5 | 91% | 91% | 0.70 | 389 |
+| BAAI/bge-small-en-v1.5 | 91% | 91% | 0.70 | 1470 |
 | intfloat/multilingual-e5-small | 88% | 88% | 0.71 | 414 |
 ## Answers — full system (all-minilm-l6-v2)
 
