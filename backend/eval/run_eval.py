@@ -289,16 +289,18 @@ def main() -> None:
     parser.add_argument("--retrieval", action="store_true")
     parser.add_argument("--answers", action="store_true")
     parser.add_argument("--report", action="store_true")
-    parser.add_argument("--model", default=None, help="embedding model (uses collection sage_chunks_<slug>)")
+    parser.add_argument("--model", default=None, help="embedding model (reads its vectors from eval_chunk_embeddings; run eval.reembed <model> first)")
     parser.add_argument("--pace", type=float, default=8.0, help="seconds between answer calls (free tiers)")
     parser.add_argument("--fresh", action="store_true", help="ignore cached answers")
     args = parser.parse_args()
 
     model = args.model or os.environ.get("EMBEDDING_MODEL_NAME") or DEFAULT_MODEL
     if args.model and args.model != DEFAULT_MODEL:
-        # Must be set before app settings are first read.
+        # Must be set before app settings are first read. EMBEDDING_MODEL_NAME makes
+        # the query embed with this model; EVAL_EMBEDDING_MODEL routes retrieval to
+        # this model's vectors in eval_chunk_embeddings instead of chunks.embedding.
         os.environ["EMBEDDING_MODEL_NAME"] = args.model
-        os.environ["CHROMA_COLLECTION_NAME"] = f"sage_chunks_{model_slug(args.model)}"
+        os.environ["EVAL_EMBEDDING_MODEL"] = args.model
     sys.path.insert(0, str(EVAL_DIR.parent))
 
     if args.retrieval:

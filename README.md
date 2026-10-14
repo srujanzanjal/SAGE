@@ -12,7 +12,7 @@ Users struggle to search and understand dispersed information across web pages, 
 
 - Ingest multiple source types (website, PDF, video, GitHub)
 - Generate semantic chunks and deterministic overview chunks
-- Store vectors in ChromaDB and metadata in Supabase
+- Store vectors and metadata together in Supabase (pgvector)
 - Support source-grounded QA with citations and confidence scores
 - Provide Grounded and Exploratory modes
 - Offer a website-only Chrome side panel for quick website QA
@@ -46,8 +46,7 @@ AI / NLP:
 - Groq API (automatic fallback LLM, free tier)
 
 Database & Storage:
-- Supabase (Postgres metadata)
-- ChromaDB (vector storage)
+- Supabase (Postgres metadata + pgvector embeddings)
 
 Extraction:
 - Playwright (web pages)
@@ -67,8 +66,7 @@ User Input
 → Chunking
 → Source Overview Chunk Creation
 → Embeddings
-→ ChromaDB Vector Storage
-→ Supabase Metadata Storage
+→ Supabase (pgvector) Vector + Metadata Storage
 → QA Request
 → Query Rewrite
 → Retrieval
