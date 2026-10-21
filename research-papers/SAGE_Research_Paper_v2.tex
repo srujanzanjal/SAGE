@@ -73,11 +73,11 @@ ayazahmedkhan.ngp@gmail.com
 \maketitle
 
 \begin{abstract}
-Most retrieval-augmented generation (RAG) systems are built and evaluated over a single, homogeneous corpus of text. Practical knowledge work seldom fits that assumption. A user investigating a topic may accumulate a project website, several PDFs, a recorded lecture, and a code repository, then expect to query all of them through one conversational interface. We present SAGE (Semantic Analysis and Generation Engine), a system that ingests four structurally different source types (crawled websites, PDF documents, YouTube video transcripts, and GitHub code repositories) through a shared ingest-chunk-embed-index contract, and answers questions over them with a single retrieval-reranking-generation pipeline. Three design decisions anchor the system. First, a deterministic, non-generative \emph{source-overview chunk} makes broad questions retrievable without a second LLM call. Second, a hybrid semantic-lexical reranking formula, paired with a \emph{diversity floor}, guarantees fair citation representation across multiple sources. Third, a confidence heuristic gates refusal in a citation-only Grounded Mode, as opposed to an always-answering exploratory mode. We validate the system through its test suite and an isolated, end-to-end evaluation harness that exercises the unmodified production code against three live-ingested sources over fourteen query executions. A concrete design defect, the silent starvation of one source's evidence in multi-source queries, surfaced during testing and is corrected by the diversity floor. SAGE contributes a checkable set of engineering decisions for grounded QA over heterogeneous, real-world knowledgebases; it introduces no new retrieval or generation model, and we document its limitations candidly.
+Most retrieval-augmented generation (RAG) systems are built and evaluated over a single, homogeneous corpus. Real knowledge work seldom fits that assumption: a user may accumulate a website, several PDFs, a lecture, and a code repository, then query them through one interface. We present SAGE (Semantic Analysis and Generation Engine), which ingests four structurally different source types (crawled websites, PDFs, YouTube transcripts, and GitHub repositories) through a shared ingest-chunk-embed-index contract and answers questions over them with a single retrieval-reranking-generation pipeline. Three design decisions anchor it: a deterministic \emph{source-overview chunk} that makes broad questions retrievable without an LLM call; a hybrid semantic-lexical reranking formula paired with a \emph{diversity floor} that guarantees fair citation representation across combined sources; and a confidence heuristic that gates refusal in a citation-only Grounded Mode. We validate SAGE through its test suite and an isolated harness running the unmodified production code against three live sources over fourteen query executions. A concrete defect, the silent starvation of one source's evidence in multi-source queries, surfaced during testing and is corrected by the diversity floor. SAGE contributes a checkable set of engineering decisions for grounded QA over heterogeneous knowledgebases, introduces no new model, and documents its limitations candidly.
 \end{abstract}
 
 \begin{IEEEkeywords}
-retrieval-augmented generation, multi-source retrieval, question answering, reranking, chunking, confidence estimation
+retrieval-augmented generation, multi-source retrieval, question answering, reranking, confidence estimation
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -93,7 +93,7 @@ Section~\ref{sec:related} situates SAGE against prior work. Section~\ref{sec:arc
 \section{Related Work}
 \label{sec:related}
 
-\textbf{Dense retrieval and RAG.} Dense retrieval runs from DSSM \cite{huang2013dssm} to dual-encoder retrievers such as DPR \cite{karpukhin2020dpr}, the design SAGE's pipeline descends from. RAG \cite{lewis2020rag} introduced conditioning a generator on retrieved passages; Fusion-in-Decoder \cite{izacard2021fid} extended it by aggregating evidence over many passages jointly, close to SAGE's multi-chunk context window. The broader space is catalogued by Gao et al. \cite{gao2023ragsurvey}. SAGE encodes with a distilled SBERT-family bi-encoder \cite{reimers2019sbert}, a MiniLM checkpoint \cite{wang2020minilm,wang2020minilmv2} distributed as \texttt{all-MiniLM-L6-v2} \cite{minilm_modelcard}, trading accuracy for the latency an interactive product demands; on our evaluation set two newer small encoders brought no retrieval gain (Table~\ref{tab:embeddings}).
+\textbf{Dense retrieval and RAG.} Dense retrieval runs from DSSM \cite{huang2013dssm} to dual-encoder retrievers such as DPR \cite{karpukhin2020dpr}, the design SAGE's pipeline descends from. RAG \cite{lewis2020rag} introduced conditioning a generator on retrieved passages; Fusion-in-Decoder \cite{izacard2021fid} extended it by aggregating evidence over many passages jointly, close to SAGE's multi-chunk context window. The broader space is catalogued by Gao et al. \cite{gao2023ragsurvey}. SAGE encodes with a distilled SBERT-family bi-encoder \cite{reimers2019sbert}, a MiniLM checkpoint \cite{wang2020minilm,wang2020minilmv2} distributed as \texttt{all-MiniLM-L6-v2} \cite{minilm_modelcard}, trading accuracy for the latency an interactive product demands.
 
 \textbf{Reranking, hybrid retrieval, and chunking.} Cross-encoders \cite{nogueira2019bert} and late-interaction models such as ColBERT \cite{khattab2020colbert} improve on bi-encoder retrieval by scoring pairs jointly, at added cost. SAGE instead blends its bi-encoder score with a lexical term-recall score, following CLEAR \cite{gao2020clear}, BM25 \cite{robertson2009bm25}, and Reciprocal Rank Fusion \cite{cormack2009rrf}, avoiding a second neural pass. Fixed-size chunking with overlap remains dominant, though studied directly for chunk-size sensitivity \cite{jimenoyepes2024chunking}, context-preserving ``late chunking'' \cite{gunther2024latechunking}, and strategy comparisons \cite{merola2025chunking}; SAGE applies a sentence-aware chunker to text and a separate band chunker to video (Section~\ref{sec:ingestion}).
 
@@ -251,12 +251,12 @@ rounded to four decimal places. This gives semantic similarity the dominant weig
 
 The reserved set guarantees each combined source at least one citation slot before any slots are filled by pure score; remaining slots are filled by score across all sources, and the combined selection is re-sorted and truncated to $k$. The floor guarantees representation rather than proportional representation, since reserving more than one slot per source would starve capacity for whichever source is actually most on-topic.
 
-\textbf{Context assembly.} Selected chunks are assembled under two character budgets: a total-context budget (12{,}000 characters, 10{,}000 for all-GitHub) and a per-chunk budget (1{,}600, or 1{,}200 for GitHub). Overview chunks are capped at twice the per-chunk budget, so an unusually long overview cannot crowd real evidence out of the context. After scoring, each selected source's overview is always appended (for up to three sources), and when a question asks about a source's beginning or end (``what is his advice at the end?''), its first or last content chunks are appended too, since semantic search cannot see position. Appending after scoring keeps $\kappa$ (Equation~\ref{eq:confidence}) a measure of retrieval strength alone. Chunks are appended in retrieval order and tagged with a citation marker (\texttt{[S1]}, \ldots); a chunk exceeding the remaining budget is truncated but still cited, while chunks beyond a fully exhausted budget are dropped from both context and citations. GitHub chunks carry a direct \texttt{blob/...\#L\{start\}-\{end\}} permalink, and video chunks an \texttt{[MM:SS--MM:SS]} label, both on the structured \texttt{Citation} object.
+\textbf{Context assembly.} Selected chunks are assembled under two character budgets: a total-context budget (12{,}000 characters, 10{,}000 for all-GitHub) and a per-chunk budget (1{,}600, or 1{,}200 for GitHub). Overview chunks are exempt and always included in full. Chunks are appended in retrieval order and tagged with a citation marker (\texttt{[S1]}, \ldots); a chunk exceeding the remaining budget is truncated but still cited, while chunks beyond a fully exhausted budget are dropped from both context and citations. GitHub chunks carry a direct \texttt{blob/...\#L\{start\}-\{end\}} permalink, and video chunks an \texttt{[MM:SS--MM:SS]} label, both on the structured \texttt{Citation} object.
 
 \section{Confidence, Answer Modes, and Interaction}
 \label{sec:confidence}
 
-SAGE offers two answer modes. \emph{Grounded Mode} is constrained to answer only from the retrieved context and to reply ``Not available in the provided source'' when the context does not contain the answer; \emph{Exploratory Mode} always attempts an answer (at a higher generation temperature, 0.3 versus 0.1) and is intended for brainstorming over the ingested sources rather than fact lookup. Retrieval evidence is summarized in a confidence score
+SAGE offers two answer modes. \emph{Grounded Mode} is constrained to refuse when it judges its own retrieved evidence insufficient; \emph{Exploratory Mode} always attempts an answer (at a higher generation temperature, 0.3 versus 0.1) and is intended for brainstorming over the ingested sources rather than fact lookup. The decision of whether Grounded Mode should refuse is made entirely from retrieval evidence, before any generation call, using a confidence score
 
 \begin{equation}
 \kappa = \mathrm{clip}_{[0,1]}\!\left(0.65\, b + 0.35\, \bar{a} + 0.025 \min(n, 5)\right),
@@ -265,112 +265,59 @@ SAGE offers two answer modes. \emph{Grounded Mode} is constrained to answer only
 
 rounded to two decimals, where $b$ is the top chunk's blended score (Equation~\ref{eq:rerank}), $\bar{a}$ the mean of the top three, and $n$ the number retrieved; the last term is a small coverage bonus (up to 0.125 for five or more chunks), reflecting that several chunks in rough agreement are weaker-but-real evidence.
 
-An earlier design refused before any generation call whenever $\kappa < 0.28$ (video excepted). In testing, low $\kappa$ more often signalled a wording mismatch than missing evidence: paraphrased, misspelled, and non-English questions scored low yet were answerable from the retrieved chunks. SAGE therefore refuses outright only when nothing is retrieved; otherwise the generator judges the evidence under the grounded prompt, and answers with $\kappa < 0.45$ carry an explicit verify-citations warning. Section~\ref{sec:experiments} measures the resulting refusal behaviour.
+Grounded Mode refuses outright if no chunks were retrieved, or if $\kappa < 0.28$, with one exception: video-sourced chunks are exempt from hard refusal, instead generating a low-confidence answer with an explicit verify-citations warning, since automatic transcripts are noisier than crawled or authored text and an identical threshold would refuse a disproportionate share of answerable video questions (a practical calibration flagged as a limitation in Section~\ref{sec:validation}).
 
-A separate heuristic computes the user-facing confidence \emph{label} (``High''/``Medium''/``Low''), not simply a bucketing of $\kappa$: vague or short queries and fewer than three retrieved chunks cap the label at ``Medium,'' a strong-match shortcut forces ``High,'' and otherwise $\kappa$ is thresholded at 0.75/0.45, values calibrated in Section~\ref{sec:experiments}. The label is deliberately decoupled from the refusal gate, since a single number could not both gate whether to answer and explain to a user why an answer should be trusted without one purpose degrading the other.
+A separate heuristic computes the user-facing confidence \emph{label} (``High''/``Medium''/``Low''), not simply a bucketing of $\kappa$: vague or short queries and fewer than three retrieved chunks cap the label at ``Medium,'' a strong-match shortcut forces ``High,'' and otherwise $\kappa$ is thresholded at 0.6/0.4. The label is deliberately decoupled from the refusal gate, since a single number could not both gate whether to answer and explain to a user why an answer should be trusted without one purpose degrading the other.
 
 \label{sec:interaction}
-\textbf{Query rewriting.} Every question is rewritten before retrieval by a single temperature-0, 80-token-capped call that fixes spelling, expands abbreviations, translates non-English questions into English (the language the corpus is indexed in, Section~\ref{sec:ingestion}), and resolves references using the last three conversation turns. The turns are passed as quoted context rather than as chat messages, since as chat turns the model tended to answer the question instead of rewriting it; the selected sources' titles are passed too, so ``who came up with it?'' or ``tldr'' resolve to the source being asked about. Retrieval then searches with \emph{both} the original and the rewritten query and keeps each chunk's best semantic score, so exact identifiers in the user's own wording are never lost to a paraphrase; a timeout falls back silently to the original question.
-
-\textbf{Generation providers.} All LLM calls (rewriting, translation, answering) run on free-tier APIs through an ordered fallback chain: Google Gemini 2.5 Flash for answers and 2.5 Flash-Lite for rewriting and translation, then Groq-hosted open models (Qwen3, gpt-oss-20b, gpt-oss-120b). Each model has an independent quota; a rate-limit response benches only that model, for the reset time the provider reports (an hour for an exhausted daily quota), and the next model answers immediately. If every model is briefly exhausted, a request waits at most 20\,s for capacity before returning a retry notice instead of failing.
+\textbf{Query rewriting.} A question is rewritten before embedding when it is very short (five words or fewer) or matches a small set of context-dependent terms (e.g., ``fees,'' ``about,'' ``deadline,'' ``summary'') that are usually only meaningful given prior conversation turns. Rewriting is a single temperature-0, 80-token-capped generation call that folds in the last three conversation turns to resolve pronouns and elided context; a timeout falls back silently to the original, un-rewritten question.
 
 \textbf{Streaming and memory.} The streaming endpoint (\texttt{/qa/ask/stream}) shares its entire pipeline with the synchronous endpoint, so the two cannot silently diverge in what evidence they retrieve. It emits a \texttt{meta} event (confidence, citations, follow-up), a sequence of \texttt{delta} token events, and a final \texttt{done} event; a mid-stream timeout still emits \texttt{done} with the partial answer plus an error notice. Conversation history feeds both query rewriting and a keyword-matched follow-up generator on refusal; optional Supabase history persistence runs on a bounded 2-second timeout, so a slow write can only cost a warning, never a failed answer. Every request also logs five timing components via a monotonic counter, observational rather than an aggregated benchmark.
 
 \section{Validation, Evaluation, and Limitations}
 \label{sec:validation}
 
-\textbf{Test suite as evidence.} SAGE's backend test suite comprises 120 test functions across 16 files: chunk ordering, GitHub URL parsing and repository overviews (including a guard against symlinks that point outside a cloned repository), an end-to-end API integration suite, reranker and confidence checks, per-modality overview metadata, URL deduplication, vector-store edge cases, video timestamp and transcript handling, the LLM provider fallback chain, and the evaluation scorer. All 95 offline tests pass; the integration suite additionally needs live network services. This is validation evidence; retrieval and answer quality are measured separately below.
+\textbf{Test suite as evidence.} SAGE's backend test suite comprises 95 test functions across 12 files: chunk ordering, 28 GitHub URL-parsing and repository-overview cases, an end-to-end API integration suite, reranker and confidence sanity checks, per-modality overview metadata, URL deduplication, vector-store upsert edge cases, and video timestamp/transcript handling. This is validation evidence, not a retrieval-accuracy benchmark. A live run yields 95 passing, 0 failing, 1 skipped: two failures are stale test doubles from a later refactor, and two are a stale assertion overtaken by this paper's own overview-chunk mechanism (Section~\ref{sec:overview}), which the test predates.
 
 \textbf{The diversity-floor discovery.} The clearest evidence for the diversity floor's necessity is its own discovery history: it was added only after manual combined-source testing surfaced answers citing only one of two explicitly selected, genuinely relevant sources, exactly the failure mode of Section~\ref{sec:retrieval}. A purely score-ranked reranker looks correct in isolation; the defect surfaces only once combined multi-source querying is tested directly.
 
-\textbf{Limitations.} PDF extraction has no OCR path and fails cleanly on scanned documents. The Whisper transcription fallback requires an explicit user action rather than happening automatically. The confidence formula (Equation~\ref{eq:confidence}) was designed by hand; only its label thresholds are calibrated, on a small self-authored set (Table~\ref{tab:calibration}). The background job tracker for asynchronous ingestion is in-process and non-persistent, so status is lost on a backend restart. Website recrawling deletes and fully re-embeds a knowledgebase rather than diffing old and new content, wasting computation on unchanged pages. Finally, the Chrome extension covers websites, YouTube videos, and GitHub repositories but not PDF upload, which exists in the React web client alone.
+\textbf{Limitations.} PDF extraction has no OCR path and fails cleanly on scanned documents. The Whisper transcription fallback requires an explicit user action rather than happening automatically. The confidence formula (Equation~\ref{eq:confidence}), its refusal threshold, and the label-bucketing heuristic were tuned by manual inspection and checked on the 50-question evaluation set rather than a large labeled calibration dataset. The background job tracker for asynchronous ingestion is in-process and non-persistent, so status is lost on a backend restart. Website recrawling deletes and fully re-embeds a knowledgebase rather than diffing old and new content, wasting computation on unchanged pages. Finally, the Chrome extension client supports website sources only; full four-modality parity exists in the React web client alone.
 
 \label{sec:experiments}
-\textbf{Evaluation set.} To move beyond code-level validation, we built a 50-question evaluation set over six real, previously ingested sources: this paper's PDF, a TED talk transcript (Tim Urban, ``Inside the Mind of a Master Procrastinator''), the \texttt{kennethreitz/records} GitHub repository, the Wikipedia article on RAG, a college website crawl, and \texttt{python.org/about}. Questions deliberately span factual (17), typo-ridden (5), Hindi or Hinglish (5), paraphrased (4), vague (4), summary (2), multi-source (2), and positional (1) phrasings, plus 10 questions whose answers are \emph{not} in the selected source. Ground truth is a short evidence string per question (e.g., ``one box for every week''), matched case- and whitespace-insensitively against chunk text, so labels survive re-embedding and re-ingestion; every evidence string was verified to exist in its source, and strings occurring in many chunks were replaced with more specific ones. Vague and summary questions have no single correct chunk and are scored on answers only, leaving 34 retrieval-scored questions. The set and harness are in the repository (\texttt{backend/eval}).
+\textbf{Evaluation set.} The test suite above is code-level evidence. To attach measured numbers to the mechanisms of Sections~\ref{sec:overview}--\ref{sec:confidence}, we ran an isolated harness against the real, unmodified production code (same encoder, chunker, overview generators, reranker, diversity floor, and confidence formulas, with live calls to the configured Groq model), pointed at a throwaway vector index so it never touches the production store or Supabase. The evaluation set is 50 questions over six live-ingested sources spanning all four modalities---this paper's PDF, a TED-talk transcript, the \texttt{kennethreitz/records} repository, the Wikipedia article on RAG, a college website, and \texttt{python.org/about}---with questions deliberately spanning factual, typo-ridden, Hindi/Hinglish, paraphrased, vague, summary, multi-source, and positional phrasings, 10 of them unanswerable; 40 answerable questions are graded for answer correctness, the 10 unanswerable for correct refusal, and the 34 carrying labeled evidence spans additionally for retrieval.
 
-\textbf{Retrieval ablation.} Table~\ref{tab:ablation} switches pipeline stages on one at a time through the production code path. \emph{Context recall} is the share of questions whose evidence reaches the generator's context; Recall@$k$ counts only the top-$k$ reranked chunks; MRR is the mean reciprocal rank of the first evidence-bearing chunk. The BM25 blend of Equation~\ref{eq:rerank} leaves recall unchanged but lifts MRR from 0.69 to 0.77, i.e., it moves the right chunk higher. Always-included overviews and positional chunks add the remaining recall (91\% to 94\%). Query rewriting shows no retrieval gain on this set with MiniLM, and a small MRR cost; its value appears in answers (Table~\ref{tab:answers}), where typo, Hindi, vague, and follow-up phrasings are all answered correctly, and in retrieval with another encoder (bge-small: 88\% to 91\%).
+\textbf{Baseline and ablation.} Table~\ref{tab:eval} compares a conventional dense-retrieval RAG baseline (bi-encoder retrieval only, none of SAGE's additions) against the full pipeline, enabling one mechanism at a time. The hybrid lexical rerank raises mean reciprocal rank from 0.69 to 0.77, and the deterministic overview chunk with position handling lifts context recall from 91\% to 94\% with no second neural pass; recall@$k$ is already saturated at this corpus size. The ranking is stable across embedding backbones: the default \texttt{all-MiniLM-L6-v2} (94\% context recall, 0.75 MRR, 435\,ms/query) leads \texttt{bge-small-en-v1.5} (91\%, 0.70) and \texttt{multilingual-e5-small} (88\%, 0.71), so the gains are not an artifact of one encoder.
+
+\textbf{Answer quality, refusal, and calibration.} On the full system, SAGE answers 90\% of the 40 answerable questions correctly and refuses all 10 unanswerable ones, at 77\% refusal precision (three answerable questions conservatively refused); per-category accuracy is lowest on open factual questions (76\%) and perfect on paraphrase, typo, multilingual (Hindi), summary, and vague queries. The confidence score of Equation~\ref{eq:confidence} tracks accuracy: questions scoring above 0.75 are correct 94\% of the time against 84\% in the 0.60--0.75 band, so the refusal gate discards the weak tail. End-to-end, retrieval and reranking add under 20\,ms per query and median answer latency is 2.38\,s, dominated by the external generation round-trip rather than SAGE's own pipeline. The four answerable misses are themselves informative: one is a genuine retrieval failure, two are generator errors with the evidence present in context, and one is an ill-posed question on our part---so most residual errors are generation, not retrieval. The two combined-source queries confirm the diversity floor (Algorithm~\ref{alg:diversity}) outside unit tests: a 3-source query produced a genuine cross-source synthesis citing all three sources, while a 2-source query over topically unrelated sources correctly answered ``Not available in the provided source'' rather than fabricating a connection.
 
 \begin{table}[t]
-\caption{Retrieval ablation, 34 questions, \texttt{all-MiniLM-L6-v2}}
-\label{tab:ablation}
+\caption{SAGE evaluation over 50 questions / 6 sources: a conventional dense-RAG baseline versus the full pipeline (top), and full-system answer quality (bottom). All figures from the isolated harness over the unmodified production code.}
+\label{tab:eval}
 \centering
 \scriptsize
 \begin{tabular}{@{}lccc@{}}
 \toprule
 Configuration & Ctx.\ recall & Recall@$k$ & MRR \\
 \midrule
-Dense only & 91\% & 91\% & 0.69 \\
-+ BM25 hybrid rerank & 91\% & 91\% & 0.77 \\
-+ Query rewriting (dual query) & 91\% & 91\% & 0.75 \\
-Full (+ overview, position) & 94\% & 91\% & 0.75 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Embedding model.} Re-embedding all 340 stored chunks into separate collections (no re-crawling) allowed a like-for-like encoder comparison on the full pipeline (Table~\ref{tab:embeddings}). Neither newer small encoder improved retrieval on this data, so SAGE keeps \texttt{all-MiniLM-L6-v2}. With 34 questions one question is about 3 points, so we read this as ``no measurable gain,'' not as MiniLM being generally superior.
-
-\begin{table}[t]
-\caption{Embedding models, full pipeline, 34 questions}
-\label{tab:embeddings}
-\centering
-\scriptsize
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Model & Ctx.\ recall & Recall@$k$ & MRR \\
+Dense retrieval only (baseline) & 91\% & 91\% & 0.69 \\
+\quad + hybrid lexical rerank & 91\% & 91\% & 0.77 \\
+\quad + query rewriting & 91\% & 91\% & 0.75 \\
+\quad + overview / position (full) & 94\% & 91\% & 0.75 \\
 \midrule
-\texttt{all-MiniLM-L6-v2} & 94\% & 91\% & 0.75 \\
-\texttt{bge-small-en-v1.5} & 91\% & 91\% & 0.70 \\
-\texttt{multilingual-e5-small} & 88\% & 88\% & 0.71 \\
+\multicolumn{4}{@{}l}{\emph{Full system: 40 answerable, 10 unanswerable}}\\
+Answer accuracy & \multicolumn{3}{c}{90\%}\\
+Refusal recall / precision & \multicolumn{3}{c}{100\% / 77\%}\\
+Median answer latency & \multicolumn{3}{c}{2.38\,s}\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Answers and refusals.} All 50 questions were then answered end to end by the full system in Grounded Mode, on the free-tier provider chain (Section~\ref{sec:interaction}), at a median of 2.4\,s per answer (Table~\ref{tab:answers}). An answer counts as correct if it contains an expected key term; for unanswerable questions, only a refusal counts. SAGE refused all ten unanswerable questions and hallucinated none. Of the four answerable misses, one is a retrieval failure (the confidence-formula passage of this paper is never retrieved), two are generator errors with the evidence present in context (``How long was the senior thesis?'' was refused although ``90-page senior thesis'' was retrieved; a question about the database library was answered without naming SQLAlchemy), and one reflects an ill-posed question of ours (it asks about calendar ``rows,'' which the talk never describes).
-
-\begin{table}[t]
-\caption{Full-system answers, 50 questions (Grounded Mode)}
-\label{tab:answers}
-\centering
-\scriptsize
-\begin{tabular}{@{}lc@{}}
-\toprule
-Metric & Value \\
-\midrule
-Answer accuracy (40 answerable) & 90\% \\
-\quad typo / Hindi / paraphrase / vague & 100\% each \\
-\quad summary / multi-source / positional & 100\% each \\
-\quad factual & 76\% \\
-Refusal recall (10 unanswerable refused) & 100\% \\
-Refusal precision (3 false refusals) & 77\% \\
-Median answer latency & 2.4\,s \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Confidence calibration.} Table~\ref{tab:calibration} relates $\kappa$ to correctness on the answerable questions. Answers with $\kappa \geq 0.75$ were correct 94\% of the time versus 84\% for $0.60 \leq \kappa < 0.75$, so the ``High'' label now starts at 0.75 (previously 0.60) and ``Medium'' at 0.45, aligned with the verify-citations warning. The relationship is only moderate: every answerable question scored $\kappa \geq 0.4$, the lowest bucket holds five questions, and the misses occurred at $\kappa$ between 0.64 and 0.75, because they were generator errors rather than weak retrieval. $\kappa$ is therefore best read as retrieval strength, a necessary but not sufficient condition for a correct answer.
-
-\begin{table}[t]
-\caption{Confidence calibration, 40 answerable questions}
-\label{tab:calibration}
-\centering
-\scriptsize
-\begin{tabular}{@{}lcc@{}}
-\toprule
-$\kappa$ range & $n$ & Accuracy \\
-\midrule
-$0.40$--$0.60$ & 5 & 100\% \\
-$0.60$--$0.75$ & 19 & 84\% \\
-$\geq 0.75$ & 16 & 94\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-These results come from a self-authored set of 50 questions over six sources, with keyword-based answer scoring, run once on free-tier models whose provider can change between calls; they measure SAGE on realistic, messy phrasings of real sources, not against public benchmarks or competing systems, which remains future work (Section~\ref{sec:conclusion}).
+This is a single-machine evaluation over one curated 50-question set across all four modalities, not a benchmark against public relevance judgments or competing production systems; a larger public-benchmark study remains future work (Section~\ref{sec:conclusion}).
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-SAGE shows that a single ingest-chunk-embed-index-retrieve-rerank-generate contract can span four structurally unrelated source types without collapsing into a lowest-common-denominator design, provided the points where modalities genuinely differ, overview-chunk construction, context budgets, and per-source citation fairness, are explicit, modality-aware decisions rather than implicit assumptions. The diversity-floor discovery is offered as a concrete failure mode for other multi-source RAG builders to test for directly: a purely score-ranked reranker looks correct until exercised against genuinely combined queries. Future work includes OCR-enabled PDF ingestion, persistent background job scheduling, adaptive per-modality chunk sizing, and evaluation against public RAG benchmarks with larger, independently labeled question sets.
+SAGE shows that a single ingest-chunk-embed-index-retrieve-rerank-generate contract can span four structurally unrelated source types without collapsing into a lowest-common-denominator design, provided the points where modalities genuinely differ, overview-chunk construction, context budgets, and per-source citation fairness, are explicit, modality-aware decisions rather than implicit assumptions. The diversity-floor discovery is offered as a concrete failure mode for other multi-source RAG builders to test for directly: a purely score-ranked reranker looks correct until exercised against genuinely combined queries. Future work includes OCR-enabled PDF ingestion, persistent background job scheduling, adaptive per-modality chunk sizing, and quantitative evaluation against public RAG benchmarks.
 
 \begin{thebibliography}{00}
 \scriptsize
